@@ -19,6 +19,7 @@ interface FailureAnalysisProps {
   loading: boolean;
   providerMap: Record<string, string>;
   providerModels: Record<string, Set<string>>;
+  authIndexProviderMap?: Record<string, string>;
 }
 
 interface ModelFailureStat {
@@ -40,7 +41,7 @@ interface FailureStat {
   models: Record<string, ModelFailureStat>;
 }
 
-export function FailureAnalysis({ data, loading, providerMap, providerModels }: FailureAnalysisProps) {
+export function FailureAnalysis({ data, loading, providerMap, providerModels, authIndexProviderMap }: FailureAnalysisProps) {
   const { t } = useTranslation();
   const [expandedChannel, setExpandedChannel] = useState<string | null>(null);
   const [filterChannel, setFilterChannel] = useState('');
@@ -85,7 +86,10 @@ export function FailureAnalysis({ data, loading, providerMap, providerModels }: 
           if (detail.failed) {
             const source = detail.source || 'unknown';
             const { provider } = getProviderDisplayParts(source, providerMap);
-            if (provider) {
+            const authProvider = detail.auth_index && authIndexProviderMap
+              ? authIndexProviderMap[String(detail.auth_index)]
+              : null;
+            if (provider || authProvider) {
               failedSources.add(source);
             }
           }
@@ -104,14 +108,21 @@ export function FailureAnalysis({ data, loading, providerMap, providerModels }: 
           if (!failedSources.has(source)) return;
 
           const { provider, masked } = getProviderDisplayParts(source, providerMap);
-          const displayName = provider ? `${provider} (${masked})` : masked;
+          const authProvider = detail.auth_index && authIndexProviderMap
+            ? authIndexProviderMap[String(detail.auth_index)]
+            : null;
+          const displayName = provider
+            ? `${provider} (${masked})`
+            : authProvider
+              ? `${authProvider} (${masked})`
+              : masked;
           const timestamp = detail.timestamp ? new Date(detail.timestamp).getTime() : 0;
 
           if (!stats[displayName]) {
             stats[displayName] = {
               source,
               displayName,
-              providerName: provider,
+              providerName: provider || authProvider,
               maskedKey: masked,
               failedCount: 0,
               lastFailTime: 0,

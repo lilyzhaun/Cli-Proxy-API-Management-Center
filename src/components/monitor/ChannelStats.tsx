@@ -19,6 +19,7 @@ interface ChannelStatsProps {
   loading: boolean;
   providerMap: Record<string, string>;
   providerModels: Record<string, Set<string>>;
+  authIndexProviderMap?: Record<string, string>;
 }
 
 interface ModelStat {
@@ -44,7 +45,7 @@ interface ChannelStat {
   models: Record<string, ModelStat>;
 }
 
-export function ChannelStats({ data, loading, providerMap, providerModels }: ChannelStatsProps) {
+export function ChannelStats({ data, loading, providerMap, providerModels, authIndexProviderMap }: ChannelStatsProps) {
   const { t } = useTranslation();
   const [expandedChannel, setExpandedChannel] = useState<string | null>(null);
   const [filterChannel, setFilterChannel] = useState('');
@@ -90,14 +91,21 @@ export function ChannelStats({ data, loading, providerMap, providerModels }: Cha
           const source = detail.source || 'unknown';
           // 获取渠道显示信息
           const { provider, masked } = getProviderDisplayParts(source, providerMap);
-          const displayName = provider ? `${provider} (${masked})` : masked;
+          const authProvider = detail.auth_index && authIndexProviderMap
+            ? authIndexProviderMap[String(detail.auth_index)]
+            : null;
+          const displayName = provider
+            ? `${provider} (${masked})`
+            : authProvider
+              ? `${authProvider} (${masked})`
+              : masked;
           const timestamp = detail.timestamp ? new Date(detail.timestamp).getTime() : 0;
 
           if (!stats[displayName]) {
             stats[displayName] = {
               source,
               displayName,
-              providerName: provider,
+              providerName: provider || authProvider,
               maskedKey: masked,
               totalRequests: 0,
               successRequests: 0,
@@ -107,6 +115,8 @@ export function ChannelStats({ data, loading, providerMap, providerModels }: Cha
               recentRequests: [],
               models: {},
             };
+          } else if (!stats[displayName].providerName && (provider || authProvider)) {
+            stats[displayName].providerName = provider || authProvider;
           }
 
           stats[displayName].totalRequests++;
@@ -171,7 +181,7 @@ export function ChannelStats({ data, loading, providerMap, providerModels }: Cha
       .filter((stat) => stat.totalRequests > 0)
       .sort((a, b) => b.totalRequests - a.totalRequests)
       .slice(0, 10);
-  }, [timeFilteredData, providerMap]);
+  }, [timeFilteredData, providerMap, authIndexProviderMap]);
 
   // 获取所有渠道和模型列表
   const { channels, models } = useMemo(() => {

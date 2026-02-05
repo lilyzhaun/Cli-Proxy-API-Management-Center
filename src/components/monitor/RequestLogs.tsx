@@ -23,6 +23,7 @@ interface RequestLogsProps {
   loading: boolean;
   providerMap: Record<string, string>;
   providerTypeMap: Record<string, string>;
+  authIndexProviderMap?: Record<string, string>;
   apiFilter: string;
 }
 
@@ -58,7 +59,7 @@ interface PrecomputedStats {
 // 虚拟滚动行高
 const ROW_HEIGHT = 40;
 
-export function RequestLogs({ data, loading: parentLoading, providerMap, providerTypeMap, apiFilter }: RequestLogsProps) {
+export function RequestLogs({ data, loading: parentLoading, providerMap, providerTypeMap, authIndexProviderMap, apiFilter }: RequestLogsProps) {
   const { t } = useTranslation();
   const [filterApi, setFilterApi] = useState('');
   const [filterModel, setFilterModel] = useState('');
@@ -267,7 +268,10 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
           const displayName = provider ? `${provider} (${masked})` : masked;
           const timestampMs = detail.timestamp ? new Date(detail.timestamp).getTime() : 0;
           // 获取提供商类型
-          const providerType = providerTypeMap[source] || '--';
+          const authProvider = detail.auth_index && authIndexProviderMap
+            ? authIndexProviderMap[String(detail.auth_index)]
+            : null;
+          const providerType = providerTypeMap[source] || authProvider || '--';
           entries.push({
             id: `${idCounter++}`,
             timestamp: detail.timestamp,

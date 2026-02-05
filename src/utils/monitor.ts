@@ -29,10 +29,14 @@ export interface DisableState {
  */
 export function maskSecret(key: string): string {
   if (!key || key === '-' || key === 'unknown') return key || '-';
-  if (key.length <= 8) {
-    return `${key.slice(0, 4)}***`;
+  let normalized = key;
+  if (normalized.startsWith('gemini-') && normalized.endsWith('.json')) {
+    normalized = normalized.slice(7, -5);
   }
-  return `${key.slice(0, 4)}***${key.slice(-4)}`;
+  if (normalized.length <= 8) {
+    return `${normalized.slice(0, 4)}***`;
+  }
+  return `${normalized.slice(0, 4)}***${normalized.slice(-4)}`;
 }
 
 /**
