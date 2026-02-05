@@ -90,10 +90,7 @@ export function ChannelStats({ data, loading, providerMap, providerModels }: Cha
           const source = detail.source || 'unknown';
           // 获取渠道显示信息
           const { provider, masked } = getProviderDisplayParts(source, providerMap);
-          // 只统计在 providerMap 中存在的渠道
-          if (!provider) return;
-
-          const displayName = `${provider} (${masked})`;
+          const displayName = provider ? `${provider} (${masked})` : masked;
           const timestamp = detail.timestamp ? new Date(detail.timestamp).getTime() : 0;
 
           if (!stats[displayName]) {
