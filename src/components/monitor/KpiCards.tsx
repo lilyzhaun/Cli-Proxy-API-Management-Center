@@ -150,12 +150,18 @@ export function KpiCards({ data, loading, timeRange, modelPrices }: KpiCardsProp
           {loading ? '--' : formatNumber(stats.totalRequests)}
         </div>
         <div className={styles.kpiMeta}>
-          <span style={{ color: '#3b82f6' }}>
-            {t('monitor.kpi.success')}: {loading ? '--' : stats.successRequests.toLocaleString()}
+          <span>
+            <span style={{ color: '#10b981' }}>
+              {t('monitor.kpi.success')}: {loading ? '--' : stats.successRequests.toLocaleString()}
+            </span>
             {' '}
-            {t('monitor.kpi.failed')}: {loading ? '--' : stats.failedRequests.toLocaleString()}
+            <span style={{ color: '#ef4444' }}>
+              {t('monitor.kpi.failed')}: {loading ? '--' : stats.failedRequests.toLocaleString()}
+            </span>
             {' '}
-            {loading ? '--' : stats.successRate.toFixed(1)}%
+            <span style={{ color: '#3b82f6' }}>
+              {loading ? '--' : stats.successRate.toFixed(1)}%
+            </span>
           </span>
           <span>
             连续成功请求: {loading ? '--' : stats.consecutiveSuccesses.toLocaleString()}
