@@ -36,6 +36,7 @@ export function KpiCards({ data, loading, timeRange, modelPrices }: KpiCardsProp
         successRequests: 0,
         failedRequests: 0,
         successRate: 0,
+        consecutiveSuccesses: 0,
         totalTokens: 0,
         inputTokens: 0,
         outputTokens: 0,
@@ -51,6 +52,9 @@ export function KpiCards({ data, loading, timeRange, modelPrices }: KpiCardsProp
     // 使用 collectUsageDetails 收集所有详情（会自动添加 __modelName）
     const allDetails = collectUsageDetails(data);
 
+    // 按时间排序（最新的在最后）
+    allDetails.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
     let totalRequests = 0;
     let successRequests = 0;
     let failedRequests = 0;
@@ -60,6 +64,16 @@ export function KpiCards({ data, loading, timeRange, modelPrices }: KpiCardsProp
     let reasoningTokens = 0;
     let cachedTokens = 0;
     let totalCost = 0;
+
+    // 计算连续成功请求数
+    let consecutiveSuccesses = 0;
+    for (let i = allDetails.length - 1; i >= 0; i--) {
+      if (!allDetails[i].failed) {
+        consecutiveSuccesses++;
+      } else {
+        break;
+      }
+    }
 
     // 收集所有时间戳用于计算 TPM/RPM
     const timestamps: number[] = [];
@@ -107,6 +121,7 @@ export function KpiCards({ data, loading, timeRange, modelPrices }: KpiCardsProp
       successRequests,
       failedRequests,
       successRate,
+      consecutiveSuccesses,
       totalTokens,
       inputTokens,
       outputTokens,
@@ -135,14 +150,15 @@ export function KpiCards({ data, loading, timeRange, modelPrices }: KpiCardsProp
           {loading ? '--' : formatNumber(stats.totalRequests)}
         </div>
         <div className={styles.kpiMeta}>
-          <span className={styles.kpiSuccess}>
+          <span style={{ color: '#3b82f6' }}>
             {t('monitor.kpi.success')}: {loading ? '--' : stats.successRequests.toLocaleString()}
-          </span>
-          <span className={styles.kpiFailure}>
+            {' '}
             {t('monitor.kpi.failed')}: {loading ? '--' : stats.failedRequests.toLocaleString()}
+            {' '}
+            {loading ? '--' : stats.successRate.toFixed(1)}%
           </span>
           <span>
-            {t('monitor.kpi.rate')}: {loading ? '--' : stats.successRate.toFixed(1)}%
+            连续成功请求: {loading ? '--' : stats.consecutiveSuccesses.toLocaleString()}
           </span>
         </div>
       </div>
@@ -211,12 +227,12 @@ export function KpiCards({ data, loading, timeRange, modelPrices }: KpiCardsProp
           <span className={styles.kpiTag}>{timeRangeLabel}</span>
         </div>
         <div className={styles.kpiValue}>
-          {loading ? '--' : Object.keys(modelPrices).length > 0 ? `$${stats.totalCost.toFixed(4)}` : '--'}
+          {loading ? '--' : Object.keys(modelPrices).length > 0 ? `$${stats.totalCost.toFixed(2)}` : '--'}
         </div>
         <div className={styles.kpiMeta}>
           <span>
             {Object.keys(modelPrices).length > 0 
-              ? t('monitor.kpi.total_tokens') + ': ' + formatNumber(stats.totalTokens)
+              ? '总 Tokens: ' + formatNumber(stats.totalTokens)
               : t('monitor.kpi.cost_need_price')}
           </span>
         </div>
