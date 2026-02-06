@@ -202,8 +202,7 @@ export function ChannelStats({
 
     return Object.values(stats)
       .filter((stat) => stat.totalRequests > 0)
-      .sort((a, b) => b.totalRequests - a.totalRequests)
-      .slice(0, 10);
+      .sort((a, b) => b.totalRequests - a.totalRequests);
   }, [timeFilteredData, providerMap, sourceInfoMap, authFileMap]);
 
   // 获取所有渠道和模型列表

@@ -46,7 +46,14 @@ interface FailureStat {
   models: Record<string, ModelFailureStat>;
 }
 
-export function FailureAnalysis({ data, loading, providerMap, providerModels, sourceInfoMap, authFileMap }: FailureAnalysisProps) {
+export function FailureAnalysis({
+  data,
+  loading,
+  providerMap,
+  providerModels,
+  sourceInfoMap,
+  authFileMap,
+}: FailureAnalysisProps) {
   const { t } = useTranslation();
   const [expandedChannel, setExpandedChannel] = useState<string | null>(null);
   const [filterChannel, setFilterChannel] = useState('');
@@ -102,9 +109,17 @@ export function FailureAnalysis({ data, loading, providerMap, providerModels, so
           if (detail.failed) {
             const source = detail.source || 'unknown';
             const normalizedSource = getNormalized(source);
-            const sourceInfo = resolveSourceDisplay(normalizedSource, detail.auth_index, sourceInfoMap, credMap);
+            const sourceInfo = resolveSourceDisplay(
+              normalizedSource,
+              detail.auth_index,
+              sourceInfoMap,
+              credMap
+            );
             const { provider } = getProviderDisplayParts(source, providerMap);
-            if (provider || (sourceInfo.displayName && sourceInfo.displayName !== normalizedSource)) {
+            if (
+              provider ||
+              (sourceInfo.displayName && sourceInfo.displayName !== normalizedSource)
+            ) {
               failedSources.add(source);
             }
           }
@@ -123,11 +138,17 @@ export function FailureAnalysis({ data, loading, providerMap, providerModels, so
           if (!failedSources.has(source)) return;
 
           const normalizedSource = getNormalized(source);
-          const sourceInfo = resolveSourceDisplay(normalizedSource, detail.auth_index, sourceInfoMap, credMap);
+          const sourceInfo = resolveSourceDisplay(
+            normalizedSource,
+            detail.auth_index,
+            sourceInfoMap,
+            credMap
+          );
           const { provider, masked } = getProviderDisplayParts(source, providerMap);
-          const resolvedName = sourceInfo.displayName && sourceInfo.displayName !== normalizedSource
-            ? sourceInfo.displayName
-            : provider;
+          const resolvedName =
+            sourceInfo.displayName && sourceInfo.displayName !== normalizedSource
+              ? sourceInfo.displayName
+              : provider;
           const displayName = provider
             ? `${provider} (${masked})`
             : resolvedName
@@ -172,7 +193,10 @@ export function FailureAnalysis({ data, loading, providerMap, providerModels, so
           } else {
             stats[displayName].models[modelName].success++;
           }
-          stats[displayName].models[modelName].recentRequests.push({ failed: detail.failed, timestamp });
+          stats[displayName].models[modelName].recentRequests.push({
+            failed: detail.failed,
+            timestamp,
+          });
           if (timestamp > stats[displayName].models[modelName].lastTimestamp) {
             stats[displayName].models[modelName].lastTimestamp = timestamp;
           }
@@ -183,9 +207,7 @@ export function FailureAnalysis({ data, loading, providerMap, providerModels, so
     // 计算成功率并排序请求
     Object.values(stats).forEach((stat) => {
       Object.values(stat.models).forEach((model) => {
-        model.successRate = model.total > 0
-          ? (model.success / model.total) * 100
-          : 0;
+        model.successRate = model.total > 0 ? (model.success / model.total) * 100 : 0;
         model.recentRequests.sort((a, b) => a.timestamp - b.timestamp);
         model.recentRequests = model.recentRequests.slice(-12);
       });
@@ -193,8 +215,7 @@ export function FailureAnalysis({ data, loading, providerMap, providerModels, so
 
     return Object.values(stats)
       .filter((stat) => stat.failedCount > 0)
-      .sort((a, b) => b.failedCount - a.failedCount)
-      .slice(0, 10);
+      .sort((a, b) => b.failedCount - a.failedCount);
   }, [timeFilteredData, providerMap, sourceInfoMap, authFileMap]);
 
   // 获取所有渠道和模型列表
@@ -257,7 +278,10 @@ export function FailureAnalysis({ data, loading, providerMap, providerModels, so
         subtitle={
           <span>
             {formatTimeRangeCaption(timeRange, customRange, t)} · {t('monitor.failure.subtitle')}
-            <span style={{ color: 'var(--text-tertiary)' }}> · {t('monitor.failure.click_hint')}</span>
+            <span style={{ color: 'var(--text-tertiary)' }}>
+              {' '}
+              · {t('monitor.failure.click_hint')}
+            </span>
           </span>
         }
         extra={
@@ -277,7 +301,9 @@ export function FailureAnalysis({ data, loading, providerMap, providerModels, so
           >
             <option value="">{t('monitor.channel.all_channels')}</option>
             {channels.map((channel) => (
-              <option key={channel} value={channel}>{channel}</option>
+              <option key={channel} value={channel}>
+                {channel}
+              </option>
             ))}
           </select>
           <select
@@ -287,7 +313,9 @@ export function FailureAnalysis({ data, loading, providerMap, providerModels, so
           >
             <option value="">{t('monitor.channel.all_models')}</option>
             {models.map((model) => (
-              <option key={model} value={model}>{model}</option>
+              <option key={model} value={model}>
+                {model}
+              </option>
             ))}
           </select>
         </div>
@@ -311,7 +339,9 @@ export function FailureAnalysis({ data, loading, providerMap, providerModels, so
               <tbody>
                 {filteredStats.map((stat) => {
                   const topModels = getTopFailedModels(stat.source, stat.models);
-                  const totalFailedModels = Object.values(stat.models).filter(m => m.failure > 0).length;
+                  const totalFailedModels = Object.values(stat.models).filter(
+                    (m) => m.failure > 0
+                  ).length;
 
                   return (
                     <Fragment key={stat.displayName}>
@@ -333,8 +363,11 @@ export function FailureAnalysis({ data, loading, providerMap, providerModels, so
                         <td>{formatTimestamp(stat.lastFailTime)}</td>
                         <td>
                           {topModels.map(([model, modelStat]) => {
-                            const percent = ((modelStat.failure / stat.failedCount) * 100).toFixed(0);
-                            const shortModel = model.length > 16 ? model.slice(0, 13) + '...' : model;
+                            const percent = ((modelStat.failure / stat.failedCount) * 100).toFixed(
+                              0
+                            );
+                            const shortModel =
+                              model.length > 16 ? model.slice(0, 13) + '...' : model;
                             const disabled = isModelDisabled(stat.source, model);
                             return (
                               <span
@@ -347,9 +380,7 @@ export function FailureAnalysis({ data, loading, providerMap, providerModels, so
                             );
                           })}
                           {totalFailedModels > 2 && (
-                            <span className={styles.moreModelsHint}>
-                              +{totalFailedModels - 2}
-                            </span>
+                            <span className={styles.moreModelsHint}>+{totalFailedModels - 2}</span>
                           )}
                         </td>
                       </tr>
@@ -357,75 +388,99 @@ export function FailureAnalysis({ data, loading, providerMap, providerModels, so
                         <tr key={`${stat.displayName}-detail`}>
                           <td colSpan={4} className={styles.expandDetail}>
                             <div className={styles.expandTableWrapper}>
-                            <table className={styles.table}>
-                              <thead>
-                                <tr>
-                                  <th>{t('monitor.channel.model')}</th>
-                                  <th>{t('monitor.channel.header_count')}</th>
-                                  <th>{t('monitor.channel.header_rate')}</th>
-                                  <th>{t('monitor.channel.success')}/{t('monitor.channel.failed')}</th>
-                                  <th>{t('monitor.channel.header_recent')}</th>
-                                  <th>{t('monitor.channel.header_time')}</th>
-                                  <th>{t('monitor.logs.header_actions')}</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {Object.entries(stat.models)
-                                  .filter(([, m]) => m.failure > 0)
-                                  .sort((a, b) => {
-                                    const aDisabled = isModelDisabled(stat.source, a[0]);
-                                    const bDisabled = isModelDisabled(stat.source, b[0]);
-                                    // 已禁用的排在后面
-                                    if (aDisabled !== bDisabled) {
-                                      return aDisabled ? 1 : -1;
-                                    }
-                                    // 然后按失败数降序
-                                    return b[1].failure - a[1].failure;
-                                  })
-                                  .map(([modelName, modelStat]) => {
-                                    const disabled = isModelDisabled(stat.source, modelName);
-                                    return (
-                                      <tr key={modelName} className={disabled ? styles.modelDisabled : ''}>
-                                        <td>{modelName}</td>
-                                        <td>{modelStat.total.toLocaleString()}</td>
-                                        <td className={getRateClassName(modelStat.successRate, styles)}>
-                                          {modelStat.successRate.toFixed(1)}%
-                                        </td>
-                                        <td>
-                                          <span className={styles.kpiSuccess}>{modelStat.success}</span>
-                                          {' / '}
-                                          <span className={styles.kpiFailure}>{modelStat.failure}</span>
-                                        </td>
-                                        <td>
-                                          <div className={styles.statusBars}>
-                                            {modelStat.recentRequests.map((req, i) => (
-                                              <div
-                                                key={i}
-                                                className={`${styles.statusBar} ${req.failed ? styles.failure : styles.success}`}
-                                              />
-                                            ))}
-                                          </div>
-                                        </td>
-                                        <td>{formatTimestamp(modelStat.lastTimestamp)}</td>
-                                        <td>
-                                          {stat.providerType.toLowerCase() === 'openai' ? (
-                                            disabled ? (
-                                              <span className={styles.disabledLabel}>{t('monitor.logs.removed')}</span>
-                                            ) : stat.source && stat.source !== '-' && stat.source !== 'unknown' ? (
-                                              <button
-                                                className={styles.disableBtn}
-                                                onClick={(e) => handleDisableClick(stat.source, modelName, e)}
-                                              >
-                                                {t('monitor.logs.disable')}
-                                              </button>
-                                            ) : '-'
-                                          ) : '-'}
-                                        </td>
-                                      </tr>
-                                    );
-                                  })}
-                              </tbody>
-                            </table>
+                              <table className={styles.table}>
+                                <thead>
+                                  <tr>
+                                    <th>{t('monitor.channel.model')}</th>
+                                    <th>{t('monitor.channel.header_count')}</th>
+                                    <th>{t('monitor.channel.header_rate')}</th>
+                                    <th>
+                                      {t('monitor.channel.success')}/{t('monitor.channel.failed')}
+                                    </th>
+                                    <th>{t('monitor.channel.header_recent')}</th>
+                                    <th>{t('monitor.channel.header_time')}</th>
+                                    <th>{t('monitor.logs.header_actions')}</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {Object.entries(stat.models)
+                                    .filter(([, m]) => m.failure > 0)
+                                    .sort((a, b) => {
+                                      const aDisabled = isModelDisabled(stat.source, a[0]);
+                                      const bDisabled = isModelDisabled(stat.source, b[0]);
+                                      // 已禁用的排在后面
+                                      if (aDisabled !== bDisabled) {
+                                        return aDisabled ? 1 : -1;
+                                      }
+                                      // 然后按失败数降序
+                                      return b[1].failure - a[1].failure;
+                                    })
+                                    .map(([modelName, modelStat]) => {
+                                      const disabled = isModelDisabled(stat.source, modelName);
+                                      return (
+                                        <tr
+                                          key={modelName}
+                                          className={disabled ? styles.modelDisabled : ''}
+                                        >
+                                          <td>{modelName}</td>
+                                          <td>{modelStat.total.toLocaleString()}</td>
+                                          <td
+                                            className={getRateClassName(
+                                              modelStat.successRate,
+                                              styles
+                                            )}
+                                          >
+                                            {modelStat.successRate.toFixed(1)}%
+                                          </td>
+                                          <td>
+                                            <span className={styles.kpiSuccess}>
+                                              {modelStat.success}
+                                            </span>
+                                            {' / '}
+                                            <span className={styles.kpiFailure}>
+                                              {modelStat.failure}
+                                            </span>
+                                          </td>
+                                          <td>
+                                            <div className={styles.statusBars}>
+                                              {modelStat.recentRequests.map((req, i) => (
+                                                <div
+                                                  key={i}
+                                                  className={`${styles.statusBar} ${req.failed ? styles.failure : styles.success}`}
+                                                />
+                                              ))}
+                                            </div>
+                                          </td>
+                                          <td>{formatTimestamp(modelStat.lastTimestamp)}</td>
+                                          <td>
+                                            {stat.providerType.toLowerCase() === 'openai' ? (
+                                              disabled ? (
+                                                <span className={styles.disabledLabel}>
+                                                  {t('monitor.logs.removed')}
+                                                </span>
+                                              ) : stat.source &&
+                                                stat.source !== '-' &&
+                                                stat.source !== 'unknown' ? (
+                                                <button
+                                                  className={styles.disableBtn}
+                                                  onClick={(e) =>
+                                                    handleDisableClick(stat.source, modelName, e)
+                                                  }
+                                                >
+                                                  {t('monitor.logs.disable')}
+                                                </button>
+                                              ) : (
+                                                '-'
+                                              )
+                                            ) : (
+                                              '-'
+                                            )}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                </tbody>
+                              </table>
                             </div>
                           </td>
                         </tr>
