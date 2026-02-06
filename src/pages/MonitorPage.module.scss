@@ -173,7 +173,7 @@
 .kpiGrid {
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
 
   @include tablet {
     grid-template-columns: repeat(3, 1fr);
@@ -251,6 +251,12 @@
     --accent: #06b6d4;
     --accent-soft: rgba(6, 182, 212, 0.18);
     --accent-border: rgba(6, 182, 212, 0.35);
+  }
+
+  &.yellow {
+    --accent: #f59e0b;
+    --accent-soft: rgba(245, 158, 11, 0.18);
+    --accent-border: rgba(245, 158, 11, 0.35);
   }
 }
 

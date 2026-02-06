@@ -1,12 +1,14 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { UsageData } from '@/pages/MonitorPage';
+import { calculateCost, type ModelPrice } from '@/utils/usage';
 import styles from '@/pages/MonitorPage.module.scss';
 
 interface KpiCardsProps {
   data: UsageData | null;
   loading: boolean;
   timeRange: number;
+  modelPrices: Record<string, ModelPrice>;
 }
 
 // 格式化数字
@@ -23,7 +25,7 @@ function formatNumber(num: number): string {
   return num.toLocaleString();
 }
 
-export function KpiCards({ data, loading, timeRange }: KpiCardsProps) {
+export function KpiCards({ data, loading, timeRange, modelPrices }: KpiCardsProps) {
   const { t } = useTranslation();
 
   // 计算统计数据
@@ -42,6 +44,7 @@ export function KpiCards({ data, loading, timeRange }: KpiCardsProps) {
         avgTpm: 0,
         avgRpm: 0,
         avgRpd: 0,
+        totalCost: 0,
       };
     }
 
@@ -53,12 +56,13 @@ export function KpiCards({ data, loading, timeRange }: KpiCardsProps) {
     let outputTokens = 0;
     let reasoningTokens = 0;
     let cachedTokens = 0;
+    let totalCost = 0;
 
     // 收集所有时间戳用于计算 TPM/RPM
     const timestamps: number[] = [];
 
-    Object.values(data.apis).forEach((apiData) => {
-      Object.values(apiData.models).forEach((modelData) => {
+    Object.entries(data.apis).forEach(([apiKey, apiData]) => {
+      Object.entries(apiData.models).forEach(([modelName, modelData]) => {
         modelData.details.forEach((detail) => {
           totalRequests++;
           if (detail.failed) {
@@ -72,6 +76,10 @@ export function KpiCards({ data, loading, timeRange }: KpiCardsProps) {
           outputTokens += detail.tokens.output_tokens || 0;
           reasoningTokens += detail.tokens.reasoning_tokens || 0;
           cachedTokens += detail.tokens.cached_tokens || 0;
+
+          // 计算费用
+          const detailWithModel = { ...detail, model: modelName };
+          totalCost += calculateCost(detailWithModel, modelPrices);
 
           timestamps.push(new Date(detail.timestamp).getTime());
         });
@@ -109,8 +117,9 @@ export function KpiCards({ data, loading, timeRange }: KpiCardsProps) {
       avgTpm,
       avgRpm,
       avgRpd,
+      totalCost,
     };
-  }, [data]);
+  }, [data, modelPrices]);
 
   const timeRangeLabel = timeRange === 1
     ? t('monitor.today')
@@ -194,6 +203,24 @@ export function KpiCards({ data, loading, timeRange }: KpiCardsProps) {
         </div>
         <div className={styles.kpiMeta}>
           <span>{t('monitor.kpi.requests_per_day')}</span>
+        </div>
+      </div>
+
+      {/* 总花费 */}
+      <div className={`${styles.kpiCard} ${styles.yellow}`}>
+        <div className={styles.kpiTitle}>
+          <span className={styles.kpiLabel}>{t('monitor.kpi.total_cost')}</span>
+          <span className={styles.kpiTag}>{timeRangeLabel}</span>
+        </div>
+        <div className={styles.kpiValue}>
+          {loading ? '--' : Object.keys(modelPrices).length > 0 ? `$${stats.totalCost.toFixed(4)}` : '--'}
+        </div>
+        <div className={styles.kpiMeta}>
+          <span>
+            {Object.keys(modelPrices).length > 0 
+              ? t('monitor.kpi.total_tokens') + ': ' + formatNumber(stats.totalTokens)
+              : t('monitor.kpi.cost_need_price')}
+          </span>
         </div>
       </div>
     </div>

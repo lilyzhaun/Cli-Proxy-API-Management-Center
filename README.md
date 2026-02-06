@@ -1,6 +1,6 @@
 # CLI Proxy API 管理中心 (CPAMC)
 
-> 一个基于官方仓库二次创作的 Web 管理界面
+> 一个基于 kongkongyo 仓库二次开发的 Web 管理界面
 
 **[English](README_EN.md) | [中文](README.md)**
 
@@ -8,11 +8,21 @@
 
 ## 关于本项目
 
-本项目是基于官方 [CLI Proxy API WebUI](https://github.com/router-for-me/Cli-Proxy-API-Management-Center) 进行开发的日志监控和数据可视化管理界面
+本项目 fork 自 [kongkongyo/Cli-Proxy-API-Management-Center](https://github.com/kongkongyo/Cli-Proxy-API-Management-Center)，在其基础上进行了改进和修复。
+
+### 相比原仓库（kongkongyo）的修改
+
+本仓库与 kongkongyo 版本保持同步更新（当前基于 v1.1.6），并额外修复了以下问题：
+
+1. **改进监控中心的渠道映射和显示逻辑** - 优化了渠道与 API Key 的映射关系，使监控数据更准确
+2. **修复没有提供商映射时渠道统计无法显示的 bug** - 即使 API Key 没有配置提供商名称，也能正常显示统计信息
+3. **新增监控中心总花费 KPI 卡片** - 基于模型价格自动计算总成本
+
+这些修复专注于提升**监控中心**的稳定性和易用性。
 
 ### 与官方版本的区别
 
-本版本与官方版本其他功能保持一致，主要差异在于**新增监控中心**，对日志分析和查看的增强
+kongkongyo 版本相比官方版本的主要差异在于**新增监控中心**，对日志分析和查看的增强
 
 ### 界面预览
 
@@ -30,7 +40,7 @@
 
 ```yaml
 remote-management:
-  panel-github-repository: "https://github.com/kongkongyo/Cli-Proxy-API-Management-Center"
+  panel-github-repository: "https://github.com/lilyzhaun/Cli-Proxy-API-Management-Center"
 ```
 
 配置完成后，重启 CLI Proxy API 服务，访问 `http://<host>:<api_port>/management.html` 即可查看管理界面

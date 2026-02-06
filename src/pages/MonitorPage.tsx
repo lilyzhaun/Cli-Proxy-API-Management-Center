@@ -20,6 +20,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { useThemeStore } from '@/stores';
 import { usageApi, providersApi, authFilesApi } from '@/services/api';
+import { loadModelPrices, type ModelPrice } from '@/utils/usage';
 import { KpiCards } from '@/components/monitor/KpiCards';
 import { ModelDistributionChart } from '@/components/monitor/ModelDistributionChart';
 import { DailyTrendChart } from '@/components/monitor/DailyTrendChart';
@@ -86,6 +87,13 @@ export function MonitorPage() {
   const [providerModels, setProviderModels] = useState<Record<string, Set<string>>>({});
   const [providerTypeMap, setProviderTypeMap] = useState<Record<string, string>>({});
   const [authIndexProviderMap, setAuthIndexProviderMap] = useState<Record<string, string>>({});
+  const [modelPrices, setModelPrices] = useState<Record<string, ModelPrice>>({});
+
+  // 加载模型价格
+  useEffect(() => {
+    const prices = loadModelPrices();
+    setModelPrices(prices);
+  }, []);
 
   // 加载渠道名称映射（支持所有提供商类型）
   const loadProviderMap = useCallback(async () => {
@@ -361,7 +369,7 @@ export function MonitorPage() {
       </div>
 
       {/* KPI 卡片 */}
-      <KpiCards data={filteredData} loading={loading} timeRange={timeRange} />
+      <KpiCards data={filteredData} loading={loading} timeRange={timeRange} modelPrices={modelPrices} />
 
       {/* 图表区域 */}
       <div className={styles.chartsGrid}>
