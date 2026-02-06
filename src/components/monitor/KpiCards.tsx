@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { UsageData } from '@/pages/MonitorPage';
-import { calculateCost, type ModelPrice } from '@/utils/usage';
+import { collectUsageDetails, calculateCost, type ModelPrice } from '@/utils/usage';
 import styles from '@/pages/MonitorPage.module.scss';
 
 interface KpiCardsProps {
@@ -48,6 +48,9 @@ export function KpiCards({ data, loading, timeRange, modelPrices }: KpiCardsProp
       };
     }
 
+    // 使用 collectUsageDetails 收集所有详情（会自动添加 __modelName）
+    const allDetails = collectUsageDetails(data);
+
     let totalRequests = 0;
     let successRequests = 0;
     let failedRequests = 0;
@@ -61,29 +64,24 @@ export function KpiCards({ data, loading, timeRange, modelPrices }: KpiCardsProp
     // 收集所有时间戳用于计算 TPM/RPM
     const timestamps: number[] = [];
 
-    Object.entries(data.apis).forEach(([, apiData]) => {
-      Object.entries(apiData.models).forEach(([modelName, modelData]) => {
-        modelData.details.forEach((detail) => {
-          totalRequests++;
-          if (detail.failed) {
-            failedRequests++;
-          } else {
-            successRequests++;
-          }
+    allDetails.forEach((detail) => {
+      totalRequests++;
+      if (detail.failed) {
+        failedRequests++;
+      } else {
+        successRequests++;
+      }
 
-          totalTokens += detail.tokens.total_tokens || 0;
-          inputTokens += detail.tokens.input_tokens || 0;
-          outputTokens += detail.tokens.output_tokens || 0;
-          reasoningTokens += detail.tokens.reasoning_tokens || 0;
-          cachedTokens += detail.tokens.cached_tokens || 0;
+      totalTokens += detail.tokens.total_tokens || 0;
+      inputTokens += detail.tokens.input_tokens || 0;
+      outputTokens += detail.tokens.output_tokens || 0;
+      reasoningTokens += detail.tokens.reasoning_tokens || 0;
+      cachedTokens += detail.tokens.cached_tokens || 0;
 
-          // 计算费用
-          const detailWithModel = { ...detail, model: modelName };
-          totalCost += calculateCost(detailWithModel, modelPrices);
+      // 计算费用（detail 已经有 __modelName 了）
+      totalCost += calculateCost(detail, modelPrices);
 
-          timestamps.push(new Date(detail.timestamp).getTime());
-        });
-      });
+      timestamps.push(new Date(detail.timestamp).getTime());
     });
 
     const successRate = totalRequests > 0 ? (successRequests / totalRequests) * 100 : 0;
