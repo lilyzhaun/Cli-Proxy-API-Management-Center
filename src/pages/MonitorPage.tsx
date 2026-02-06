@@ -13,7 +13,7 @@ import {
   Title,
   Tooltip,
   Legend,
-  Filler
+  Filler,
 } from 'chart.js';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -22,6 +22,7 @@ import { useThemeStore } from '@/stores';
 import { usageApi, providersApi, authFilesApi } from '@/services/api';
 import { filterDataByApiFilter, filterDataByTimeRange } from '@/utils/monitor';
 import { buildSourceInfoMap } from '@/utils/sourceResolver';
+import { loadModelPrices, type ModelPrice } from '@/utils/usage';
 import { normalizeAuthIndex } from '@/utils/usage';
 import type { CredentialInfo } from '@/types/sourceInfo';
 import { KpiCards } from '@/components/monitor/KpiCards';
@@ -69,11 +70,17 @@ export interface UsageDetail {
 }
 
 export interface UsageData {
-  apis: Record<string, {
-    models: Record<string, {
-      details: UsageDetail[];
-    }>;
-  }>;
+  apis: Record<
+    string,
+    {
+      models: Record<
+        string,
+        {
+          details: UsageDetail[];
+        }
+      >;
+    }
+  >;
 }
 
 export function MonitorPage() {
@@ -90,8 +97,17 @@ export function MonitorPage() {
   const [providerMap, setProviderMap] = useState<Record<string, string>>({});
   const [providerModels, setProviderModels] = useState<Record<string, Set<string>>>({});
   const [providerTypeMap, setProviderTypeMap] = useState<Record<string, string>>({});
-  const [sourceInfoMap, setSourceInfoMap] = useState<Map<string, import('@/types/sourceInfo').SourceInfo>>(new Map());
+  const [sourceInfoMap, setSourceInfoMap] = useState<
+    Map<string, import('@/types/sourceInfo').SourceInfo>
+  >(new Map());
   const [authFileMap, setAuthFileMap] = useState<Map<string, CredentialInfo>>(new Map());
+  const [modelPrices, setModelPrices] = useState<Record<string, ModelPrice>>({});
+
+  // 加载模型价格
+  useEffect(() => {
+    const prices = loadModelPrices();
+    setModelPrices(prices);
+  }, []);
 
   // 加载渠道名称映射（支持所有提供商类型）
   const loadProviderMap = useCallback(async () => {
@@ -101,7 +117,14 @@ export function MonitorPage() {
       const typeMap: Record<string, string> = {};
 
       // 并行加载所有提供商配置和认证文件
-      const [openaiProviders, geminiKeys, claudeConfigs, codexConfigs, vertexConfigs, authFilesResponse] = await Promise.all([
+      const [
+        openaiProviders,
+        geminiKeys,
+        claudeConfigs,
+        codexConfigs,
+        vertexConfigs,
+        authFilesResponse,
+      ] = await Promise.all([
         providersApi.getOpenAIProviders().catch(() => []),
         providersApi.getGeminiKeys().catch(() => []),
         providersApi.getClaudeConfigs().catch(() => []),
@@ -204,13 +227,15 @@ export function MonitorPage() {
       setProviderTypeMap(typeMap);
 
       // 构建 sourceInfoMap（与请求事件明细相同的解析逻辑）
-      setSourceInfoMap(buildSourceInfoMap({
-        geminiApiKeys: geminiKeys,
-        claudeApiKeys: claudeConfigs,
-        codexApiKeys: codexConfigs,
-        vertexApiKeys: vertexConfigs,
-        openaiCompatibility: openaiProviders,
-      }));
+      setSourceInfoMap(
+        buildSourceInfoMap({
+          geminiApiKeys: geminiKeys,
+          claudeApiKeys: claudeConfigs,
+          codexApiKeys: codexConfigs,
+          vertexApiKeys: vertexConfigs,
+          openaiCompatibility: openaiProviders,
+        })
+      );
 
       // 构建 authFileMap（认证文件索引 → 凭证信息）
       const credMap = new Map<string, CredentialInfo>();
@@ -294,12 +319,7 @@ export function MonitorPage() {
       <div className={styles.header}>
         <h1 className={styles.pageTitle}>{t('monitor.title')}</h1>
         <div className={styles.headerActions}>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={loadData}
-            disabled={loading}
-          >
+          <Button variant="secondary" size="sm" onClick={loadData} disabled={loading}>
             {loading ? t('common.loading') : t('common.refresh')}
           </Button>
         </div>
@@ -340,12 +360,27 @@ export function MonitorPage() {
       </div>
 
       {/* KPI 卡片 */}
-      <KpiCards data={filteredData} loading={loading} timeRange={timeRange} />
+      <KpiCards
+        data={filteredData}
+        loading={loading}
+        timeRange={timeRange}
+        modelPrices={modelPrices}
+      />
 
       {/* 图表区域 */}
       <div className={styles.chartsGrid}>
-        <ModelDistributionChart data={filteredData} loading={loading} isDark={isDark} timeRange={timeRange} />
-        <DailyTrendChart data={filteredData} loading={loading} isDark={isDark} timeRange={timeRange} />
+        <ModelDistributionChart
+          data={filteredData}
+          loading={loading}
+          isDark={isDark}
+          timeRange={timeRange}
+        />
+        <DailyTrendChart
+          data={filteredData}
+          loading={loading}
+          isDark={isDark}
+          timeRange={timeRange}
+        />
       </div>
 
       {/* 小时级图表 */}
@@ -354,8 +389,22 @@ export function MonitorPage() {
 
       {/* 统计表格 */}
       <div className={styles.statsGrid}>
-        <ChannelStats data={filteredData} loading={loading} providerMap={providerMap} providerModels={providerModels} sourceInfoMap={sourceInfoMap} authFileMap={authFileMap} />
-        <FailureAnalysis data={filteredData} loading={loading} providerMap={providerMap} providerModels={providerModels} sourceInfoMap={sourceInfoMap} authFileMap={authFileMap} />
+        <ChannelStats
+          data={filteredData}
+          loading={loading}
+          providerMap={providerMap}
+          providerModels={providerModels}
+          sourceInfoMap={sourceInfoMap}
+          authFileMap={authFileMap}
+        />
+        <FailureAnalysis
+          data={filteredData}
+          loading={loading}
+          providerMap={providerMap}
+          providerModels={providerModels}
+          sourceInfoMap={sourceInfoMap}
+          authFileMap={authFileMap}
+        />
       </div>
 
       {/* 请求日志 */}

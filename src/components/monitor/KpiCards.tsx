@@ -1,12 +1,14 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { UsageData } from '@/pages/MonitorPage';
+import { calculateTotalCost, type ModelPrice } from '@/utils/usage';
 import styles from '@/pages/MonitorPage.module.scss';
 
 interface KpiCardsProps {
   data: UsageData | null;
   loading: boolean;
   timeRange: number;
+  modelPrices: Record<string, ModelPrice>;
 }
 
 // 格式化数字
@@ -23,7 +25,7 @@ function formatNumber(num: number): string {
   return num.toLocaleString();
 }
 
-export function KpiCards({ data, loading, timeRange }: KpiCardsProps) {
+export function KpiCards({ data, loading, timeRange, modelPrices }: KpiCardsProps) {
   const { t } = useTranslation();
 
   // 计算统计数据
@@ -42,6 +44,7 @@ export function KpiCards({ data, loading, timeRange }: KpiCardsProps) {
         avgTpm: 0,
         avgRpm: 0,
         avgRpd: 0,
+        totalCost: 0,
       };
     }
 
@@ -53,6 +56,7 @@ export function KpiCards({ data, loading, timeRange }: KpiCardsProps) {
     let outputTokens = 0;
     let reasoningTokens = 0;
     let cachedTokens = 0;
+    const totalCost = calculateTotalCost(data, modelPrices);
 
     // 追踪时间戳范围用于计算 TPM/RPM
     let minTime = Infinity;
@@ -93,7 +97,7 @@ export function KpiCards({ data, loading, timeRange }: KpiCardsProps) {
       const timeSpanDays = Math.max(timeSpanMinutes / (60 * 24), 1);
 
       avgTpm = Math.round(totalTokens / timeSpanMinutes);
-      avgRpm = Math.round(totalRequests / timeSpanMinutes * 10) / 10;
+      avgRpm = Math.round((totalRequests / timeSpanMinutes) * 10) / 10;
       avgRpd = Math.round(totalRequests / timeSpanDays);
     }
 
@@ -110,12 +114,12 @@ export function KpiCards({ data, loading, timeRange }: KpiCardsProps) {
       avgTpm,
       avgRpm,
       avgRpd,
+      totalCost,
     };
-  }, [data]);
+  }, [data, modelPrices]);
 
-  const timeRangeLabel = timeRange === 1
-    ? t('monitor.today')
-    : t('monitor.last_n_days', { n: timeRange });
+  const timeRangeLabel =
+    timeRange === 1 ? t('monitor.today') : t('monitor.last_n_days', { n: timeRange });
 
   return (
     <div className={styles.kpiGrid}>
@@ -125,9 +129,7 @@ export function KpiCards({ data, loading, timeRange }: KpiCardsProps) {
           <span className={styles.kpiLabel}>{t('monitor.kpi.requests')}</span>
           <span className={styles.kpiTag}>{timeRangeLabel}</span>
         </div>
-        <div className={styles.kpiValue}>
-          {loading ? '--' : formatNumber(stats.totalRequests)}
-        </div>
+        <div className={styles.kpiValue}>{loading ? '--' : formatNumber(stats.totalRequests)}</div>
         <div className={styles.kpiMeta}>
           <span className={styles.kpiSuccess}>
             {t('monitor.kpi.success')}: {loading ? '--' : stats.successRequests.toLocaleString()}
@@ -147,12 +149,14 @@ export function KpiCards({ data, loading, timeRange }: KpiCardsProps) {
           <span className={styles.kpiLabel}>{t('monitor.kpi.tokens')}</span>
           <span className={styles.kpiTag}>{timeRangeLabel}</span>
         </div>
-        <div className={styles.kpiValue}>
-          {loading ? '--' : formatNumber(stats.totalTokens)}
-        </div>
+        <div className={styles.kpiValue}>{loading ? '--' : formatNumber(stats.totalTokens)}</div>
         <div className={styles.kpiMeta}>
-          <span>{t('monitor.kpi.input')}: {loading ? '--' : formatNumber(stats.inputTokens)}</span>
-          <span>{t('monitor.kpi.output')}: {loading ? '--' : formatNumber(stats.outputTokens)}</span>
+          <span>
+            {t('monitor.kpi.input')}: {loading ? '--' : formatNumber(stats.inputTokens)}
+          </span>
+          <span>
+            {t('monitor.kpi.output')}: {loading ? '--' : formatNumber(stats.outputTokens)}
+          </span>
         </div>
       </div>
 
@@ -162,9 +166,7 @@ export function KpiCards({ data, loading, timeRange }: KpiCardsProps) {
           <span className={styles.kpiLabel}>{t('monitor.kpi.avg_tpm')}</span>
           <span className={styles.kpiTag}>{timeRangeLabel}</span>
         </div>
-        <div className={styles.kpiValue}>
-          {loading ? '--' : formatNumber(stats.avgTpm)}
-        </div>
+        <div className={styles.kpiValue}>{loading ? '--' : formatNumber(stats.avgTpm)}</div>
         <div className={styles.kpiMeta}>
           <span>{t('monitor.kpi.tokens_per_minute')}</span>
         </div>
@@ -176,9 +178,7 @@ export function KpiCards({ data, loading, timeRange }: KpiCardsProps) {
           <span className={styles.kpiLabel}>{t('monitor.kpi.avg_rpm')}</span>
           <span className={styles.kpiTag}>{timeRangeLabel}</span>
         </div>
-        <div className={styles.kpiValue}>
-          {loading ? '--' : stats.avgRpm.toFixed(1)}
-        </div>
+        <div className={styles.kpiValue}>{loading ? '--' : stats.avgRpm.toFixed(1)}</div>
         <div className={styles.kpiMeta}>
           <span>{t('monitor.kpi.requests_per_minute')}</span>
         </div>
@@ -190,11 +190,31 @@ export function KpiCards({ data, loading, timeRange }: KpiCardsProps) {
           <span className={styles.kpiLabel}>{t('monitor.kpi.avg_rpd')}</span>
           <span className={styles.kpiTag}>{timeRangeLabel}</span>
         </div>
-        <div className={styles.kpiValue}>
-          {loading ? '--' : formatNumber(stats.avgRpd)}
-        </div>
+        <div className={styles.kpiValue}>{loading ? '--' : formatNumber(stats.avgRpd)}</div>
         <div className={styles.kpiMeta}>
           <span>{t('monitor.kpi.requests_per_day')}</span>
+        </div>
+      </div>
+
+      {/* 总花费 */}
+      <div className={`${styles.kpiCard} ${styles.yellow}`}>
+        <div className={styles.kpiTitle}>
+          <span className={styles.kpiLabel}>{t('monitor.kpi.total_cost')}</span>
+          <span className={styles.kpiTag}>{timeRangeLabel}</span>
+        </div>
+        <div className={styles.kpiValue}>
+          {loading
+            ? '--'
+            : Object.keys(modelPrices).length > 0
+              ? `$${stats.totalCost.toFixed(4)}`
+              : '--'}
+        </div>
+        <div className={styles.kpiMeta}>
+          <span>
+            {Object.keys(modelPrices).length > 0
+              ? t('monitor.kpi.total_tokens') + ': ' + formatNumber(stats.totalTokens)
+              : t('monitor.kpi.cost_need_price')}
+          </span>
         </div>
       </div>
     </div>

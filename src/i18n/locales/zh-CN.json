@@ -1528,7 +1528,9 @@
       "avg_rpd": "日均 RPD",
       "tokens_per_minute": "每分钟 Token",
       "requests_per_minute": "每分钟请求",
-      "requests_per_day": "每日请求数"
+      "requests_per_day": "每日请求数",
+      "total_cost": "总花费",
+      "cost_need_price": "需要设置模型价格"
     },
     "distribution": {
       "title": "模型用量分布",

@@ -1528,7 +1528,9 @@
       "avg_rpd": "Avg RPD",
       "tokens_per_minute": "Tokens per minute",
       "requests_per_minute": "Requests per minute",
-      "requests_per_day": "Requests per day"
+      "requests_per_day": "Requests per day",
+      "total_cost": "Total Cost",
+      "cost_need_price": "Need to set model prices"
     },
     "distribution": {
       "title": "Model Usage Distribution",
