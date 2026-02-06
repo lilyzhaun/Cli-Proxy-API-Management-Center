@@ -143,10 +143,16 @@ export function KpiCards({ data, loading, timeRange, modelPrices }: KpiCardsProp
         </div>
         <div className={styles.kpiValue}>{loading ? '--' : formatNumber(stats.totalRequests)}</div>
         <div className={styles.kpiMeta}>
-          <span style={{ color: '#3b82f6' }}>
-            {t('monitor.kpi.success')}: {loading ? '--' : stats.successRequests.toLocaleString()}{' '}
-            {t('monitor.kpi.failed')}: {loading ? '--' : stats.failedRequests.toLocaleString()}{' '}
-            {loading ? '--' : stats.successRate.toFixed(1)}%
+          <span>
+            <span style={{ color: '#10b981' }}>
+              {t('monitor.kpi.success')}: {loading ? '--' : stats.successRequests.toLocaleString()}
+            </span>{' '}
+            <span style={{ color: '#ef4444' }}>
+              {t('monitor.kpi.failed')}: {loading ? '--' : stats.failedRequests.toLocaleString()}
+            </span>{' '}
+            <span style={{ color: '#3b82f6' }}>
+              {loading ? '--' : stats.successRate.toFixed(1)}%
+            </span>
           </span>
           <span>Streak: {loading ? '--' : stats.consecutiveSuccesses.toLocaleString()}</span>
         </div>
