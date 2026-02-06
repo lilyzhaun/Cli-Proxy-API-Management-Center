@@ -373,7 +373,7 @@ export function MonitorPage() {
 
       {/* 图表区域 */}
       <div className={styles.chartsGrid}>
-        <ModelDistributionChart data={filteredData} loading={loading} isDark={isDark} timeRange={timeRange} />
+        <ModelDistributionChart data={filteredData} loading={loading} isDark={isDark} timeRange={timeRange} modelPrices={modelPrices} />
         <DailyTrendChart data={filteredData} loading={loading} isDark={isDark} timeRange={timeRange} />
       </div>
 

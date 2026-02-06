@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Doughnut } from 'react-chartjs-2';
 import type { UsageData } from '@/pages/MonitorPage';
+import { collectUsageDetails, calculateCost, type ModelPrice } from '@/utils/usage';
 import styles from '@/pages/MonitorPage.module.scss';
 
 interface ModelDistributionChartProps {
@@ -9,6 +10,7 @@ interface ModelDistributionChartProps {
   loading: boolean;
   isDark: boolean;
   timeRange: number;
+  modelPrices: Record<string, ModelPrice>;
 }
 
 // 颜色调色板
@@ -25,9 +27,9 @@ const COLORS = [
   '#6366f1', // 靛蓝
 ];
 
-type ViewMode = 'request' | 'token';
+type ViewMode = 'request' | 'token' | 'cost';
 
-export function ModelDistributionChart({ data, loading, isDark, timeRange }: ModelDistributionChartProps) {
+export function ModelDistributionChart({ data, loading, isDark, timeRange, modelPrices }: ModelDistributionChartProps) {
   const { t } = useTranslation();
   const [viewMode, setViewMode] = useState<ViewMode>('request');
 
@@ -39,18 +41,19 @@ export function ModelDistributionChart({ data, loading, isDark, timeRange }: Mod
   const distributionData = useMemo(() => {
     if (!data?.apis) return [];
 
-    const modelStats: Record<string, { requests: number; tokens: number }> = {};
+    const modelStats: Record<string, { requests: number; tokens: number; cost: number }> = {};
 
-    Object.values(data.apis).forEach((apiData) => {
-      Object.entries(apiData.models).forEach(([modelName, modelData]) => {
-        if (!modelStats[modelName]) {
-          modelStats[modelName] = { requests: 0, tokens: 0 };
-        }
-        modelData.details.forEach((detail) => {
-          modelStats[modelName].requests++;
-          modelStats[modelName].tokens += detail.tokens.total_tokens || 0;
-        });
-      });
+    // 使用 collectUsageDetails 收集所有详情
+    const allDetails = collectUsageDetails(data);
+
+    allDetails.forEach((detail) => {
+      const modelName = detail.__modelName || 'unknown';
+      if (!modelStats[modelName]) {
+        modelStats[modelName] = { requests: 0, tokens: 0, cost: 0 };
+      }
+      modelStats[modelName].requests++;
+      modelStats[modelName].tokens += detail.tokens.total_tokens || 0;
+      modelStats[modelName].cost += calculateCost(detail, modelPrices);
     });
 
     // 转换为数组并排序
@@ -59,22 +62,27 @@ export function ModelDistributionChart({ data, loading, isDark, timeRange }: Mod
         name,
         requests: stats.requests,
         tokens: stats.tokens,
+        cost: stats.cost,
       }))
       .sort((a, b) => {
         if (viewMode === 'request') {
           return b.requests - a.requests;
+        } else if (viewMode === 'token') {
+          return b.tokens - a.tokens;
         }
-        return b.tokens - a.tokens;
+        return b.cost - a.cost;
       });
 
     // 取 Top 10
     return sorted.slice(0, 10);
-  }, [data, viewMode]);
+  }, [data, viewMode, modelPrices]);
 
   // 计算总数
   const total = useMemo(() => {
     return distributionData.reduce((sum, item) => {
-      return sum + (viewMode === 'request' ? item.requests : item.tokens);
+      if (viewMode === 'request') return sum + item.requests;
+      if (viewMode === 'token') return sum + item.tokens;
+      return sum + item.cost;
     }, 0);
   }, [distributionData, viewMode]);
 
@@ -84,9 +92,11 @@ export function ModelDistributionChart({ data, loading, isDark, timeRange }: Mod
       labels: distributionData.map((item) => item.name),
       datasets: [
         {
-          data: distributionData.map((item) =>
-            viewMode === 'request' ? item.requests : item.tokens
-          ),
+          data: distributionData.map((item) => {
+            if (viewMode === 'request') return item.requests;
+            if (viewMode === 'token') return item.tokens;
+            return item.cost;
+          }),
           backgroundColor: COLORS.slice(0, distributionData.length),
           borderColor: isDark ? '#1f2937' : '#ffffff',
           borderWidth: 2,
@@ -142,7 +152,11 @@ export function ModelDistributionChart({ data, loading, isDark, timeRange }: Mod
         <div>
           <h3 className={styles.chartTitle}>{t('monitor.distribution.title')}</h3>
           <p className={styles.chartSubtitle}>
-            {timeRangeLabel} · {viewMode === 'request' ? t('monitor.distribution.by_requests') : t('monitor.distribution.by_tokens')}
+            {timeRangeLabel} · {
+              viewMode === 'request' ? t('monitor.distribution.by_requests') : 
+              viewMode === 'token' ? t('monitor.distribution.by_tokens') : 
+              '按花费'
+            }
             {' · Top 10'}
           </p>
         </div>
@@ -159,6 +173,13 @@ export function ModelDistributionChart({ data, loading, isDark, timeRange }: Mod
           >
             {t('monitor.distribution.tokens')}
           </button>
+          <button
+            className={`${styles.chartControlBtn} ${viewMode === 'cost' ? styles.active : ''}`}
+            onClick={() => setViewMode('cost')}
+            disabled={Object.keys(modelPrices).length === 0}
+          >
+            花费
+          </button>
         </div>
       </div>
 
@@ -174,14 +195,19 @@ export function ModelDistributionChart({ data, loading, isDark, timeRange }: Mod
             <Doughnut data={chartData} options={chartOptions} />
             <div className={styles.donutCenter}>
               <div className={styles.donutLabel}>
-                {viewMode === 'request' ? t('monitor.distribution.request_share') : t('monitor.distribution.token_share')}
+                {viewMode === 'request' ? t('monitor.distribution.request_share') : 
+                 viewMode === 'token' ? t('monitor.distribution.token_share') : 
+                 '花费占比'}
               </div>
             </div>
           </div>
           <div className={styles.legendList}>
             {distributionData.map((item, index) => {
-              const value = viewMode === 'request' ? item.requests : item.tokens;
+              const value = viewMode === 'request' ? item.requests : 
+                           viewMode === 'token' ? item.tokens : 
+                           item.cost;
               const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0';
+              const displayValue = viewMode === 'cost' ? `$${value.toFixed(2)}` : formatValue(value);
               return (
                 <div key={item.name} className={styles.legendItem}>
                   <span
@@ -192,7 +218,7 @@ export function ModelDistributionChart({ data, loading, isDark, timeRange }: Mod
                     {item.name}
                   </span>
                   <span className={styles.legendValue}>
-                    {formatValue(value)} ({percentage}%)
+                    {displayValue} ({percentage}%)
                   </span>
                 </div>
               );
