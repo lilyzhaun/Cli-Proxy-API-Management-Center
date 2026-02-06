@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { UsageData } from '@/pages/MonitorPage';
-import { calculateTotalCost, type ModelPrice } from '@/utils/usage';
+import { collectUsageDetails, calculateCost, type ModelPrice } from '@/utils/usage';
 import styles from '@/pages/MonitorPage.module.scss';
 
 interface KpiCardsProps {
@@ -48,6 +48,9 @@ export function KpiCards({ data, loading, timeRange, modelPrices }: KpiCardsProp
       };
     }
 
+    // 使用 collectUsageDetails 收集所有详情（会自动添加 __modelName）
+    const allDetails = collectUsageDetails(data);
+
     let totalRequests = 0;
     let successRequests = 0;
     let failedRequests = 0;
@@ -56,33 +59,25 @@ export function KpiCards({ data, loading, timeRange, modelPrices }: KpiCardsProp
     let outputTokens = 0;
     let reasoningTokens = 0;
     let cachedTokens = 0;
-    const totalCost = calculateTotalCost(data, modelPrices);
+    let totalCost = 0;
+    const timestamps: number[] = [];
 
-    // 追踪时间戳范围用于计算 TPM/RPM
-    let minTime = Infinity;
-    let maxTime = -Infinity;
+    allDetails.forEach((detail) => {
+      totalRequests++;
+      if (detail.failed) {
+        failedRequests++;
+      } else {
+        successRequests++;
+      }
 
-    Object.values(data.apis).forEach((apiData) => {
-      Object.values(apiData.models).forEach((modelData) => {
-        modelData.details.forEach((detail) => {
-          totalRequests++;
-          if (detail.failed) {
-            failedRequests++;
-          } else {
-            successRequests++;
-          }
+      totalTokens += detail.tokens.total_tokens || 0;
+      inputTokens += detail.tokens.input_tokens || 0;
+      outputTokens += detail.tokens.output_tokens || 0;
+      reasoningTokens += detail.tokens.reasoning_tokens || 0;
+      cachedTokens += detail.tokens.cached_tokens || 0;
 
-          totalTokens += detail.tokens.total_tokens || 0;
-          inputTokens += detail.tokens.input_tokens || 0;
-          outputTokens += detail.tokens.output_tokens || 0;
-          reasoningTokens += detail.tokens.reasoning_tokens || 0;
-          cachedTokens += detail.tokens.cached_tokens || 0;
-
-          const ts = new Date(detail.timestamp).getTime();
-          if (ts < minTime) minTime = ts;
-          if (ts > maxTime) maxTime = ts;
-        });
-      });
+      totalCost += calculateCost(detail, modelPrices);
+      timestamps.push(new Date(detail.timestamp).getTime());
     });
 
     const successRate = totalRequests > 0 ? (successRequests / totalRequests) * 100 : 0;
@@ -92,7 +87,9 @@ export function KpiCards({ data, loading, timeRange, modelPrices }: KpiCardsProp
     let avgRpm = 0;
     let avgRpd = 0;
 
-    if (minTime !== Infinity) {
+    if (timestamps.length > 0) {
+      const minTime = Math.min(...timestamps);
+      const maxTime = Math.max(...timestamps);
       const timeSpanMinutes = Math.max((maxTime - minTime) / (1000 * 60), 1);
       const timeSpanDays = Math.max(timeSpanMinutes / (60 * 24), 1);
 
