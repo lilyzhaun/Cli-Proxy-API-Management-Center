@@ -374,6 +374,7 @@ export function MonitorPage() {
           loading={loading}
           isDark={isDark}
           timeRange={timeRange}
+          modelPrices={modelPrices}
         />
         <DailyTrendChart
           data={filteredData}
