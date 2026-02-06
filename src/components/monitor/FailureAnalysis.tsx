@@ -175,8 +175,7 @@ export function FailureAnalysis({ data, loading, providerMap, providerModels, au
 
     return Object.values(stats)
       .filter((stat) => stat.failedCount > 0)
-      .sort((a, b) => b.failedCount - a.failedCount)
-      .slice(0, 10);
+      .sort((a, b) => b.failedCount - a.failedCount);
   }, [timeFilteredData, providerMap]);
 
   // 获取所有渠道和模型列表
