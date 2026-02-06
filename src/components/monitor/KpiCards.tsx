@@ -61,7 +61,7 @@ export function KpiCards({ data, loading, timeRange, modelPrices }: KpiCardsProp
     // 收集所有时间戳用于计算 TPM/RPM
     const timestamps: number[] = [];
 
-    Object.entries(data.apis).forEach(([apiKey, apiData]) => {
+    Object.entries(data.apis).forEach(([, apiData]) => {
       Object.entries(apiData.models).forEach(([modelName, modelData]) => {
         modelData.details.forEach((detail) => {
           totalRequests++;
