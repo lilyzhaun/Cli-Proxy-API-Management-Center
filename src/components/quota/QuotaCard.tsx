@@ -117,7 +117,7 @@ export function QuotaCard<TState extends QuotaStatusState>({
         >
           {getTypeLabel(displayType)}
         </span>
-        <span className={styles.fileName}>{item.name}</span>
+        <span className={styles.fileName}>{item.label || item.name}</span>
       </div>
 
       <div className={styles.quotaSection}>
