@@ -6,30 +6,62 @@ import type { TFunction } from 'i18next';
 import type { CodexUsageWindow } from '@/types';
 import { normalizeNumberValue } from './parsers';
 
+/**
+ * Format countdown time remaining
+ * @param targetDate Target date
+ * @returns Countdown string like "⏱️4h 59m" or empty string if invalid/past
+ */
+function formatCountdown(targetDate: Date): string {
+  const now = new Date();
+  const diffMs = targetDate.getTime() - now.getTime();
+  
+  if (diffMs <= 0) return ''; // Past or now
+  
+  const totalMinutes = Math.floor(diffMs / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  
+  if (hours > 0) {
+    return `⏱️${hours}h ${minutes}m`;
+  } else if (minutes > 0) {
+    return `⏱️${minutes}m`;
+  } else {
+    return '⏱️<1m';
+  }
+}
+
 export function formatQuotaResetTime(value?: string): string {
   if (!value) return '-';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '-';
-  return date.toLocaleString(undefined, {
+  
+  const timeStr = date.toLocaleString(undefined, {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
     hour12: false
   });
+  
+  const countdown = formatCountdown(date);
+  return countdown ? `${timeStr} ${countdown}` : timeStr;
 }
 
 export function formatUnixSeconds(value: number | null): string {
   if (!value) return '-';
   const date = new Date(value * 1000);
   if (Number.isNaN(date.getTime())) return '-';
-  return date.toLocaleString(undefined, {
+  
+  const timeStr = date.toLocaleString(undefined, {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
     hour12: false
   });
+  
+  const countdown = formatCountdown(date);
+  return countdown ? `${timeStr} ${countdown}` : timeStr;
 }
 
 export function formatCodexResetLabel(window?: CodexUsageWindow | null): string {
