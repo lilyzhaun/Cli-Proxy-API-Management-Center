@@ -260,6 +260,8 @@
 
 .quotaReset {
   color: var(--text-tertiary);
+  display: inline-block;
+  min-width: 150px;  // 足够容纳 "MM/DD HH:mm ⏱️99h 59m"
 }
 
 .quotaAmount {
