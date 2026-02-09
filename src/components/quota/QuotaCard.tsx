@@ -110,24 +110,24 @@ export function QuotaCard<TState extends QuotaStatusState>({
         >
           {getTypeLabel(displayType)}
         </span>
-        <span className={styles.fileName}>{item.label || item.name}</span>
+        <span className={styles.fileName}>{String(item.label || item.name)}</span>
       </div>
 
       <div className={styles.quotaSection}>
         {quotaStatus === 'loading' ? (
-          <div className={styles.quotaMessage}>{t(`${i18nPrefix}.loading`)}</div>
+          <div className={styles.quotaMessage}>{String(t(`${i18nPrefix}.loading`))}</div>
         ) : quotaStatus === 'idle' ? (
-          <div className={styles.quotaMessage}>{t(`${i18nPrefix}.idle`)}</div>
+          <div className={styles.quotaMessage}>{String(t(`${i18nPrefix}.idle`))}</div>
         ) : quotaStatus === 'error' ? (
           <div className={styles.quotaError}>
-            {t(`${i18nPrefix}.load_failed`, {
+            {String(t(`${i18nPrefix}.load_failed`, {
               message: quotaErrorMessage
-            })}
+            } as any))}
           </div>
         ) : quota ? (
-          renderQuotaItems(quota, t, { styles, QuotaProgressBar })
+          <>{renderQuotaItems(quota, t, { styles, QuotaProgressBar })}</>
         ) : (
-          <div className={styles.quotaMessage}>{t(`${i18nPrefix}.idle`)}</div>
+          <div className={styles.quotaMessage}>{String(t(`${i18nPrefix}.idle`))}</div>
         )}
       </div>
     </div>
