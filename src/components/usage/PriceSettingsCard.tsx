@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -18,6 +18,7 @@ export function PriceSettingsCard({
   onPricesChange
 }: PriceSettingsCardProps) {
   const { t } = useTranslation();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [selectedModel, setSelectedModel] = useState('');
   const [promptPrice, setPromptPrice] = useState('');
@@ -65,8 +66,67 @@ export function PriceSettingsCard({
     }
   };
 
+  const handleExport = () => {
+    const blob = new Blob([JSON.stringify(modelPrices, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `cli-proxy-model-prices-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = JSON.parse(event.target?.result as string);
+        if (typeof json === 'object' && json !== null) {
+          // Basic validation could go here
+          onPricesChange({ ...modelPrices, ...json });
+        }
+      } catch (error) {
+        console.error('Failed to parse price file', error);
+        alert(t('usage_stats.import_invalid'));
+      }
+      // Reset input value so same file can be selected again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
+
   return (
-    <Card title={t('usage_stats.model_price_settings')}>
+    <Card 
+      title={t('usage_stats.model_price_settings')}
+      extra={
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <Button variant="secondary" size="sm" onClick={handleExport}>
+            {t('usage_stats.model_price_export')}
+          </Button>
+          <Button variant="secondary" size="sm" onClick={handleImportClick}>
+            {t('usage_stats.model_price_import')}
+          </Button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            style={{ display: 'none' }}
+            accept=".json"
+            onChange={handleImportFile}
+          />
+        </div>
+      }
+    >
       <div className={styles.pricingSection}>
         {/* Price Form */}
         <div className={styles.priceForm}>
@@ -145,8 +205,7 @@ export function PriceSettingsCard({
                   </div>
                   <div className={styles.priceActions}>
                     <Button variant="secondary" size="sm" onClick={() => handleEditPrice(model)}>
-                      {t('common.edit')}
-                    </Button>
+                      {t('common.edit')}\n                    </Button>
                     <Button variant="danger" size="sm" onClick={() => handleDeletePrice(model)}>
                       {t('common.delete')}
                     </Button>
