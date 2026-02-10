@@ -122,14 +122,19 @@ export function ChannelStats({
             sourceInfo.displayName !== '-'
               ? sourceInfo.displayName
               : provider;
-          const displayName = resolvedName ? `${resolvedName} (${masked})` : masked;
+          const fallbackProvider =
+            !provider && !resolvedName && detail.auth_index
+              ? `da_${String(detail.auth_index).substring(0, 6)}`
+              : null;
+          const channelName = resolvedName || fallbackProvider;
+          const displayName = channelName ? `${channelName} (${masked})` : masked;
           const timestamp = detail.timestamp ? new Date(detail.timestamp).getTime() : 0;
 
           if (!stats[displayName]) {
             stats[displayName] = {
               source,
               displayName,
-              providerName: provider || resolvedName,
+              providerName: provider || resolvedName || fallbackProvider,
               providerType: sourceInfo.type || '',
               maskedKey: masked,
               totalRequests: 0,
