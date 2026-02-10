@@ -94,18 +94,27 @@ export function ChannelStats({ data, loading, providerMap, providerModels, authI
           const authProvider = detail.auth_index && authIndexProviderMap
             ? authIndexProviderMap[String(detail.auth_index)]
             : null;
+          
+          // 如果 provider 和 authProvider 都没找到，但有 auth_index，则构造一个临时的 provider 名称
+          const fallbackProvider = (!provider && !authProvider && detail.auth_index)
+            ? `da_${String(detail.auth_index).substring(0, 6)}`
+            : null;
+
           const displayName = provider
             ? `${provider} (${masked})`
             : authProvider
               ? `${authProvider} (${masked})`
-              : masked;
+              : fallbackProvider
+                ? `${fallbackProvider} (${masked})`
+                : masked;
+          
           const timestamp = detail.timestamp ? new Date(detail.timestamp).getTime() : 0;
 
           if (!stats[displayName]) {
             stats[displayName] = {
               source,
               displayName,
-              providerName: provider || authProvider,
+              providerName: provider || authProvider || fallbackProvider,
               maskedKey: masked,
               totalRequests: 0,
               successRequests: 0,
