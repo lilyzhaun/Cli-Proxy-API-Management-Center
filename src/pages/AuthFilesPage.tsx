@@ -22,6 +22,8 @@ import {
 } from '@/components/ui/icons';
 import type { TFunction } from 'i18next';
 import { ANTIGRAVITY_CONFIG, CODEX_CONFIG, GEMINI_CLI_CONFIG } from '@/components/quota';
+// Fork 增强: Kiro 配额支持
+import { KIRO_CONFIG } from '@/components/quota';
 import { useAuthStore, useNotificationStore, useQuotaStore, useThemeStore } from '@/stores';
 import { authFilesApi, usageApi } from '@/services/api';
 import { apiClient } from '@/services/api/client';
@@ -99,9 +101,11 @@ const AUTH_FILES_UI_STATE_KEY = 'authFilesPage.uiState';
 const clampCardPageSize = (value: number) =>
   Math.min(MAX_CARD_PAGE_SIZE, Math.max(MIN_CARD_PAGE_SIZE, Math.round(value)));
 
-type QuotaProviderType = 'antigravity' | 'codex' | 'gemini-cli';
+// Fork 增强: 添加 kiro 到 QuotaProviderType
+type QuotaProviderType = 'antigravity' | 'codex' | 'gemini-cli' | 'kiro';
 
-const QUOTA_PROVIDER_TYPES = new Set<QuotaProviderType>(['antigravity', 'codex', 'gemini-cli']);
+// Fork 增强: 添加 kiro 到 QUOTA_PROVIDER_TYPES
+const QUOTA_PROVIDER_TYPES = new Set<QuotaProviderType>(['antigravity', 'codex', 'gemini-cli', 'kiro']);
 
 const resolveQuotaErrorMessage = (
   t: TFunction,
@@ -167,6 +171,34 @@ const writeAuthFilesUiState = (state: AuthFilesUiState) => {
     window.sessionStorage.setItem(AUTH_FILES_UI_STATE_KEY, JSON.stringify(state));
   } catch {
     // ignore
+  }
+};
+
+const copyToClipboard = async (text: string): Promise<boolean> => {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // fallback below
+  }
+
+  try {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    textarea.style.left = '-9999px';
+    textarea.style.top = '0';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const copied = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    return copied;
+  } catch {
+    return false;
   }
 };
 
@@ -249,9 +281,13 @@ export function AuthFilesPage() {
   const antigravityQuota = useQuotaStore((state) => state.antigravityQuota);
   const codexQuota = useQuotaStore((state) => state.codexQuota);
   const geminiCliQuota = useQuotaStore((state) => state.geminiCliQuota);
+  // Fork 增强: Kiro 配额
+  const kiroQuota = useQuotaStore((state) => state.kiroQuota);
   const setAntigravityQuota = useQuotaStore((state) => state.setAntigravityQuota);
   const setCodexQuota = useQuotaStore((state) => state.setCodexQuota);
   const setGeminiCliQuota = useQuotaStore((state) => state.setGeminiCliQuota);
+  // Fork 增强: Kiro 配额
+  const setKiroQuota = useQuotaStore((state) => state.setKiroQuota);
   const pageTransitionLayer = usePageTransitionLayer();
   const isCurrentLayer = pageTransitionLayer ? pageTransitionLayer.status === 'current' : true;
   const navigate = useNavigate();
@@ -1016,14 +1052,28 @@ export function AuthFilesPage() {
     }
   };
 
+  const copyTextWithNotification = async (text: string) => {
+    const copied = await copyToClipboard(text);
+    showNotification(
+      copied
+        ? t('notification.link_copied', { defaultValue: 'Copied to clipboard' })
+        : t('notification.copy_failed', { defaultValue: 'Copy failed' }),
+      copied ? 'success' : 'error'
+    );
+  };
+
   // 检查模型是否被 OAuth 排除
   const isModelExcluded = (modelId: string, providerType: string): boolean => {
     const providerKey = normalizeProviderKey(providerType);
     const excludedModels = excluded[providerKey] || excluded[providerType] || [];
     return excludedModels.some((pattern) => {
       if (pattern.includes('*')) {
-        // 支持通配符匹配
-        const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$', 'i');
+        // 支持通配符匹配：先转义正则特殊字符，再将 * 视为通配符
+        const regexSafePattern = pattern
+          .split('*')
+          .map((segment) => segment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+          .join('.*');
+        const regex = new RegExp(`^${regexSafePattern}$`, 'i');
         return regex.test(modelId);
       }
       return pattern.toLowerCase() === modelId.toLowerCase();
@@ -1472,6 +1522,8 @@ export function AuthFilesPage() {
   const getQuotaConfig = (type: QuotaProviderType) => {
     if (type === 'antigravity') return ANTIGRAVITY_CONFIG;
     if (type === 'codex') return CODEX_CONFIG;
+    // Fork 增强: Kiro 配额
+    if (type === 'kiro') return KIRO_CONFIG;
     return GEMINI_CLI_CONFIG;
   };
 
@@ -1479,9 +1531,11 @@ export function AuthFilesPage() {
     (type: QuotaProviderType, fileName: string) => {
       if (type === 'antigravity') return antigravityQuota[fileName];
       if (type === 'codex') return codexQuota[fileName];
+      // Fork 增强: Kiro 配额
+      if (type === 'kiro') return kiroQuota[fileName];
       return geminiCliQuota[fileName];
     },
-    [antigravityQuota, codexQuota, geminiCliQuota]
+    [antigravityQuota, codexQuota, geminiCliQuota, kiroQuota]
   );
 
   const updateQuotaState = useCallback(
@@ -1497,9 +1551,14 @@ export function AuthFilesPage() {
         setCodexQuota(updater as never);
         return;
       }
+      // Fork 增强: Kiro 配额
+      if (type === 'kiro') {
+        setKiroQuota(updater as never);
+        return;
+      }
       setGeminiCliQuota(updater as never);
     },
-    [setAntigravityQuota, setCodexQuota, setGeminiCliQuota]
+    [setAntigravityQuota, setCodexQuota, setGeminiCliQuota, setKiroQuota]
   );
 
   const refreshQuotaForFile = useCallback(
@@ -2046,9 +2105,7 @@ export function AuthFilesPage() {
               onClick={() => {
                 if (selectedFile) {
                   const text = JSON.stringify(selectedFile, null, 2);
-                  navigator.clipboard.writeText(text).then(() => {
-                    showNotification(t('notification.link_copied'), 'success');
-                  });
+                  void copyTextWithNotification(text);
                 }
               }}
             >
@@ -2104,11 +2161,7 @@ export function AuthFilesPage() {
                   key={model.id}
                   className={`${styles.modelItem} ${isExcluded ? styles.modelItemExcluded : ''}`}
                   onClick={() => {
-                    navigator.clipboard.writeText(model.id);
-                    showNotification(
-                      t('notification.link_copied', { defaultValue: '已复制到剪贴板' }),
-                      'success'
-                    );
+                    void copyTextWithNotification(model.id);
                   }}
                   title={
                     isExcluded
