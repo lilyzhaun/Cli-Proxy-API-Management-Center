@@ -13,7 +13,7 @@ import {
   Title,
   Tooltip,
   Legend,
-  Filler
+  Filler,
 } from 'chart.js';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -29,6 +29,7 @@ import { HourlyTokenChart } from '@/components/monitor/HourlyTokenChart';
 import { ChannelStats } from '@/components/monitor/ChannelStats';
 import { FailureAnalysis } from '@/components/monitor/FailureAnalysis';
 import { RequestLogs } from '@/components/monitor/RequestLogs';
+import { ServiceHealthCard } from '@/components/usage/ServiceHealthCard';
 import styles from './MonitorPage.module.scss';
 
 // 注册 Chart.js 组件
@@ -65,11 +66,17 @@ export interface UsageDetail {
 }
 
 export interface UsageData {
-  apis: Record<string, {
-    models: Record<string, {
-      details: UsageDetail[];
-    }>;
-  }>;
+  apis: Record<
+    string,
+    {
+      models: Record<
+        string,
+        {
+          details: UsageDetail[];
+        }
+      >;
+    }
+  >;
 }
 
 export function MonitorPage() {
@@ -104,14 +111,15 @@ export function MonitorPage() {
       const authIndexMap: Record<string, string> = {};
 
       // 并行加载所有提供商配置
-      const [openaiProviders, geminiKeys, claudeConfigs, codexConfigs, vertexConfigs, authFiles] = await Promise.all([
-        providersApi.getOpenAIProviders().catch(() => []),
-        providersApi.getGeminiKeys().catch(() => []),
-        providersApi.getClaudeConfigs().catch(() => []),
-        providersApi.getCodexConfigs().catch(() => []),
-        providersApi.getVertexConfigs().catch(() => []),
-        authFilesApi.list().catch(() => ({ files: [] })),
-      ]);
+      const [openaiProviders, geminiKeys, claudeConfigs, codexConfigs, vertexConfigs, authFiles] =
+        await Promise.all([
+          providersApi.getOpenAIProviders().catch(() => []),
+          providersApi.getGeminiKeys().catch(() => []),
+          providersApi.getClaudeConfigs().catch(() => []),
+          providersApi.getCodexConfigs().catch(() => []),
+          providersApi.getVertexConfigs().catch(() => []),
+          authFilesApi.list().catch(() => ({ files: [] })),
+        ]);
 
       // 处理 OpenAI 兼容提供商
       openaiProviders.forEach((provider) => {
@@ -210,7 +218,6 @@ export function MonitorPage() {
         authIndexMap[String(authIndex)] = String(providerName);
       });
 
-
       setProviderMap(map);
       setProviderModels(modelsMap);
       setProviderTypeMap(typeMap);
@@ -226,10 +233,7 @@ export function MonitorPage() {
     setError(null);
     try {
       // 并行加载使用数据和渠道映射
-      const [response] = await Promise.all([
-        usageApi.getUsage(),
-        loadProviderMap()
-      ]);
+      const [response] = await Promise.all([usageApi.getUsage(), loadProviderMap()]);
       // API 返回的数据可能在 response.usage 或直接在 response 中
       const data = response?.usage ?? response;
       setUsageData(data as UsageData);
@@ -323,12 +327,7 @@ export function MonitorPage() {
       <div className={styles.header}>
         <h1 className={styles.pageTitle}>{t('monitor.title')}</h1>
         <div className={styles.headerActions}>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={loadData}
-            disabled={loading}
-          >
+          <Button variant="secondary" size="sm" onClick={loadData} disabled={loading}>
             {loading ? t('common.loading') : t('common.refresh')}
           </Button>
         </div>
@@ -369,12 +368,30 @@ export function MonitorPage() {
       </div>
 
       {/* KPI 卡片 */}
-      <KpiCards data={filteredData} loading={loading} timeRange={timeRange} modelPrices={modelPrices} />
+      <KpiCards
+        data={filteredData}
+        loading={loading}
+        timeRange={timeRange}
+        modelPrices={modelPrices}
+      />
+
+      <ServiceHealthCard usage={filteredData} loading={loading} />
 
       {/* 图表区域 */}
       <div className={styles.chartsGrid}>
-        <ModelDistributionChart data={filteredData} loading={loading} isDark={isDark} timeRange={timeRange} modelPrices={modelPrices} />
-        <DailyTrendChart data={filteredData} loading={loading} isDark={isDark} timeRange={timeRange} />
+        <ModelDistributionChart
+          data={filteredData}
+          loading={loading}
+          isDark={isDark}
+          timeRange={timeRange}
+          modelPrices={modelPrices}
+        />
+        <DailyTrendChart
+          data={filteredData}
+          loading={loading}
+          isDark={isDark}
+          timeRange={timeRange}
+        />
       </div>
 
       {/* 小时级图表 */}
@@ -383,8 +400,20 @@ export function MonitorPage() {
 
       {/* 统计表格 */}
       <div className={styles.statsGrid}>
-        <ChannelStats data={filteredData} loading={loading} providerMap={providerMap} providerModels={providerModels} authIndexProviderMap={authIndexProviderMap} />
-        <FailureAnalysis data={filteredData} loading={loading} providerMap={providerMap} providerModels={providerModels} authIndexProviderMap={authIndexProviderMap} />
+        <ChannelStats
+          data={filteredData}
+          loading={loading}
+          providerMap={providerMap}
+          providerModels={providerModels}
+          authIndexProviderMap={authIndexProviderMap}
+        />
+        <FailureAnalysis
+          data={filteredData}
+          loading={loading}
+          providerMap={providerMap}
+          providerModels={providerModels}
+          authIndexProviderMap={authIndexProviderMap}
+        />
       </div>
 
       {/* 请求日志 */}
