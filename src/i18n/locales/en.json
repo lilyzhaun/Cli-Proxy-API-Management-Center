@@ -1480,6 +1480,17 @@
     "copy_failed": "Copy failed",
     "link_copied": "Link copied to clipboard"
   },
+  "pwa": {
+    "update_title": "Update available",
+    "update_message": "A new app version is ready. Reload now to apply the update?",
+    "update_confirm": "Reload now",
+    "update_applying": "Applying update...",
+    "install_title": "Install app",
+    "install_message": "Install this management center as an app for a better full-screen experience.",
+    "install_confirm": "Install",
+    "install_accepted": "App installation started",
+    "install_dismissed": "Installation canceled"
+  },
   "language": {
     "switch": "Language",
     "chinese": "中文",
