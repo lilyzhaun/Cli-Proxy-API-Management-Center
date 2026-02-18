@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Chart as ChartJS,
@@ -13,10 +13,10 @@ import {
 } from 'chart.js';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { IconChevronDown } from '@/components/ui/icons';
+import { Select } from '@/components/ui/Select';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
-import { useThemeStore } from '@/stores';
+import { useThemeStore, useConfigStore } from '@/stores';
 import {
   StatCards,
   UsageChart,
@@ -24,6 +24,10 @@ import {
   ApiDetailsCard,
   ModelStatsCard,
   PriceSettingsCard,
+  CredentialStatsCard,
+  TokenBreakdownChart,
+  CostTrendChart,
+  ServiceHealthCard,
   useUsageData,
   useSparklines,
   useChartData
@@ -115,25 +119,14 @@ export function UsagePage() {
   const isMobile = useMediaQuery('(max-width: 768px)');
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const isDark = resolvedTheme === 'dark';
-
-  // Time range dropdown
-  const [timeRangeOpen, setTimeRangeOpen] = useState(false);
-  const timeRangeRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!timeRangeOpen) return;
-    const handleClickOutside = (event: MouseEvent) => {
-      if (!timeRangeRef.current?.contains(event.target as Node)) setTimeRangeOpen(false);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [timeRangeOpen]);
+  const config = useConfigStore((state) => state.config);
 
   // Data hook
   const {
     usage,
     loading,
     error,
+    lastRefreshedAt,
     modelPrices,
     setModelPrices,
     loadUsage,
@@ -150,6 +143,15 @@ export function UsagePage() {
   // Chart lines state
   const [chartLines, setChartLines] = useState<string[]>(loadChartLines);
   const [timeRange, setTimeRange] = useState<UsageTimeRange>(loadTimeRange);
+
+  const timeRangeOptions = useMemo(
+    () =>
+      TIME_RANGE_OPTIONS.map((opt) => ({
+        value: opt.value,
+        label: t(opt.labelKey)
+      })),
+    [t]
+  );
 
   const filteredUsage = useMemo(
     () => (usage ? filterUsageByTimeRange(usage, timeRange) : null),
@@ -233,44 +235,14 @@ export function UsagePage() {
         <div className={styles.headerActions}>
           <div className={styles.timeRangeGroup}>
             <span className={styles.timeRangeLabel}>{t('usage_stats.range_filter')}</span>
-            <div className={styles.timeRangeSelectWrap} ref={timeRangeRef}>
-              <button
-                type="button"
-                className={styles.timeRangeSelect}
-                onClick={() => setTimeRangeOpen((prev) => !prev)}
-                aria-haspopup="listbox"
-                aria-expanded={timeRangeOpen}
-              >
-                <span className={styles.timeRangeSelectedText}>
-                  {t(TIME_RANGE_OPTIONS.find((o) => o.value === timeRange)?.labelKey ?? 'usage_stats.range_24h')}
-                </span>
-                <span className={styles.timeRangeSelectIcon} aria-hidden="true">
-                  <IconChevronDown size={14} />
-                </span>
-              </button>
-              {timeRangeOpen && (
-                <div className={styles.timeRangeDropdown} role="listbox" aria-label={t('usage_stats.range_filter')}>
-                  {TIME_RANGE_OPTIONS.map((opt) => {
-                    const active = opt.value === timeRange;
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        role="option"
-                        aria-selected={active}
-                        className={`${styles.timeRangeOption} ${active ? styles.timeRangeOptionActive : ''}`}
-                        onClick={() => {
-                          setTimeRange(opt.value);
-                          setTimeRangeOpen(false);
-                        }}
-                      >
-                        {t(opt.labelKey)}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            <Select
+              value={timeRange}
+              options={timeRangeOptions}
+              onChange={(value) => setTimeRange(value as UsageTimeRange)}
+              className={styles.timeRangeSelectControl}
+              ariaLabel={t('usage_stats.range_filter')}
+              fullWidth={false}
+            />
           </div>
           <Button
             variant="secondary"
@@ -305,6 +277,11 @@ export function UsagePage() {
             style={{ display: 'none' }}
             onChange={handleImportChange}
           />
+          {lastRefreshedAt && (
+            <span className={styles.lastRefreshed}>
+              {t('usage_stats.last_updated')}: {lastRefreshedAt.toLocaleTimeString()}
+            </span>
+          )}
         </div>
       </div>
 
@@ -332,6 +309,9 @@ export function UsagePage() {
         onChange={handleChartLinesChange}
       />
 
+      {/* Service Health */}
+      <ServiceHealthCard usage={usage} loading={loading} />
+
       {/* Charts Grid */}
       <div className={styles.chartsGrid}>
         <UsageChart
@@ -356,11 +336,41 @@ export function UsagePage() {
         />
       </div>
 
+      {/* Token Breakdown Chart */}
+      <TokenBreakdownChart
+        usage={filteredUsage}
+        loading={loading}
+        isDark={isDark}
+        isMobile={isMobile}
+        hourWindowHours={hourWindowHours}
+      />
+
+      {/* Cost Trend Chart */}
+      <CostTrendChart
+        usage={filteredUsage}
+        loading={loading}
+        isDark={isDark}
+        isMobile={isMobile}
+        modelPrices={modelPrices}
+        hourWindowHours={hourWindowHours}
+      />
+
       {/* Details Grid */}
       <div className={styles.detailsGrid}>
         <ApiDetailsCard apiStats={apiStats} loading={loading} hasPrices={hasPrices} />
         <ModelStatsCard modelStats={modelStats} loading={loading} hasPrices={hasPrices} />
       </div>
+
+      {/* Credential Stats */}
+      <CredentialStatsCard
+        usage={filteredUsage}
+        loading={loading}
+        geminiKeys={config?.geminiApiKeys || []}
+        claudeConfigs={config?.claudeApiKeys || []}
+        codexConfigs={config?.codexApiKeys || []}
+        vertexConfigs={config?.vertexApiKeys || []}
+        openaiProviders={config?.openaiCompatibility || []}
+      />
 
       {/* Price Settings */}
       <PriceSettingsCard
