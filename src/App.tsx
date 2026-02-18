@@ -3,6 +3,7 @@ import { HashRouter, Route, Routes } from 'react-router-dom';
 import { LoginPage } from '@/pages/LoginPage';
 import { NotificationContainer } from '@/components/common/NotificationContainer';
 import { ConfirmationModal } from '@/components/common/ConfirmationModal';
+import { PwaManager } from '@/components/common/PwaManager';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { ProtectedRoute } from '@/router/ProtectedRoute';
 import { useLanguageStore, useThemeStore } from '@/stores';
@@ -28,6 +29,7 @@ function App() {
 
   return (
     <HashRouter>
+      <PwaManager />
       <NotificationContainer />
       <ConfirmationModal />
       <Routes>
