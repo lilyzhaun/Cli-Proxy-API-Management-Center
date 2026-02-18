@@ -1,7 +1,14 @@
 const APP_VERSION = 'v2';
 const STATIC_CACHE_NAME = `cpamc-static-${APP_VERSION}`;
 const RUNTIME_CACHE_NAME = `cpamc-runtime-${APP_VERSION}`;
-const CORE_ASSETS = ['/', '/index.html', '/manifest.webmanifest', '/pwa-icon.svg', '/logo.jpg'];
+const CORE_ASSETS = [
+  '/',
+  '/index.html',
+  '/manifest.webmanifest',
+  '/pwa-icon.svg',
+  '/pwa-192.png',
+  '/pwa-512.png',
+];
 
 const isCacheableResponse = (response) =>
   Boolean(response) &&
