@@ -33,6 +33,7 @@ import { HourlyTokenChart } from '@/components/monitor/HourlyTokenChart';
 import { ChannelStats } from '@/components/monitor/ChannelStats';
 import { FailureAnalysis } from '@/components/monitor/FailureAnalysis';
 import { RequestLogs } from '@/components/monitor/RequestLogs';
+import { ServiceHealthCard } from '@/components/usage/ServiceHealthCard';
 import styles from './MonitorPage.module.scss';
 
 // 注册 Chart.js 组件
@@ -116,7 +117,6 @@ export function MonitorPage() {
       const modelsMap: Record<string, Set<string>> = {};
       const typeMap: Record<string, string> = {};
 
-      // 并行加载所有提供商配置和认证文件
       const [
         openaiProviders,
         geminiKeys,
@@ -221,7 +221,6 @@ export function MonitorPage() {
           }
         }
       });
-
       setProviderMap(map);
       setProviderModels(modelsMap);
       setProviderTypeMap(typeMap);
@@ -261,8 +260,6 @@ export function MonitorPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
-    // 渠道映射并行加载，但不阻塞主数据展示
-    loadProviderMap();
     try {
       const response = await usageApi.getUsage();
       // API 返回的数据可能在 response.usage 或直接在 response 中
@@ -366,6 +363,8 @@ export function MonitorPage() {
         timeRange={timeRange}
         modelPrices={modelPrices}
       />
+
+      <ServiceHealthCard usage={filteredData} loading={loading} />
 
       {/* 图表区域 */}
       <div className={styles.chartsGrid}>
