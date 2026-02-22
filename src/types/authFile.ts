@@ -26,6 +26,10 @@ export interface AuthFileItem {
   auth_index?: string | number | null;
   runtimeOnly?: boolean | string;
   disabled?: boolean;
+  unavailable?: boolean;
+  status?: string;
+  statusMessage?: string;
+  lastRefresh?: string | number;
   modified?: number;
   [key: string]: unknown;
 }

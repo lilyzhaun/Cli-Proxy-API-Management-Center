@@ -26,10 +26,9 @@ export interface QuotaProgressBarProps {
 export function QuotaProgressBar({
   percent,
   highThreshold,
-  mediumThreshold
+  mediumThreshold,
 }: QuotaProgressBarProps) {
-  const clamp = (value: number, min: number, max: number) =>
-    Math.min(max, Math.max(min, value));
+  const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
   const normalized = percent === null ? null : clamp(percent, 0, 100);
   const fillClass =
     normalized === null
@@ -61,6 +60,7 @@ interface QuotaCardProps<TState extends QuotaStatusState> {
   quota?: TState;
   resolvedTheme: ResolvedTheme;
   i18nPrefix: string;
+  cardIdleMessageKey?: string;
   cardClassName: string;
   defaultType: string;
   renderQuotaItems: (quota: TState, t: TFunction, helpers: QuotaRenderHelpers) => ReactNode;
@@ -71,9 +71,10 @@ export function QuotaCard<TState extends QuotaStatusState>({
   quota,
   resolvedTheme,
   i18nPrefix,
+  cardIdleMessageKey,
   cardClassName,
   defaultType,
-  renderQuotaItems
+  renderQuotaItems,
 }: QuotaCardProps<TState>) {
   const { t } = useTranslation();
 
@@ -88,6 +89,7 @@ export function QuotaCard<TState extends QuotaStatusState>({
     quota?.errorStatus,
     quota?.error || t('common.unknown_error')
   );
+  const idleMessageKey = cardIdleMessageKey ?? `${i18nPrefix}.idle`;
 
   const getTypeLabel = (type: string): string => {
     const key = `auth_files.filter_${type}`;
@@ -105,7 +107,7 @@ export function QuotaCard<TState extends QuotaStatusState>({
           style={{
             backgroundColor: typeColor.bg,
             color: typeColor.text,
-            ...(typeColor.border ? { border: typeColor.border } : {})
+            ...(typeColor.border ? { border: typeColor.border } : {}),
           }}
         >
           {getTypeLabel(displayType)}
@@ -117,17 +119,19 @@ export function QuotaCard<TState extends QuotaStatusState>({
         {quotaStatus === 'loading' ? (
           <div className={styles.quotaMessage}>{String(t(`${i18nPrefix}.loading`))}</div>
         ) : quotaStatus === 'idle' ? (
-          <div className={styles.quotaMessage}>{String(t(`${i18nPrefix}.idle`))}</div>
+          <div className={styles.quotaMessage}>{String(t(idleMessageKey))}</div>
         ) : quotaStatus === 'error' ? (
           <div className={styles.quotaError}>
-            {String(t(`${i18nPrefix}.load_failed`, {
-              message: quotaErrorMessage
-            } as any))}
+            {String(
+              t(`${i18nPrefix}.load_failed`, {
+                message: quotaErrorMessage,
+              } as any)
+            )}
           </div>
         ) : quota ? (
           <>{renderQuotaItems(quota, t, { styles, QuotaProgressBar })}</>
         ) : (
-          <div className={styles.quotaMessage}>{String(t(`${i18nPrefix}.idle`))}</div>
+          <div className={styles.quotaMessage}>{String(t(idleMessageKey))}</div>
         )}
       </div>
     </div>
