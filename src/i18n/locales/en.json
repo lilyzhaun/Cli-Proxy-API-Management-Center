@@ -1068,6 +1068,7 @@
     "trace_confidence_low": "Low",
     "trace_score": "Score {{score}}",
     "trace_delta_seconds": "Δt {{seconds}}s",
+    "trace_model_matched": "Model Matched",
     "trace_request_id": "Request ID",
     "trace_method": "Method",
     "trace_path": "Path",
