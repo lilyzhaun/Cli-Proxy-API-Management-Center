@@ -4,9 +4,8 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { Card } from '@/components/ui/Card';
 import { usageApi, authFilesApi } from '@/services/api';
 import { useDisableModel } from '@/hooks';
-import { normalizeUsageSourceId, normalizeAuthIndex } from '@/utils/usage';
-import { resolveSourceDisplay } from '@/utils/sourceResolver';
-import type { SourceInfo, CredentialInfo } from '@/types/sourceInfo';
+import { normalizeAuthIndex } from '@/utils/usage';
+import type { CredentialInfo } from '@/types/sourceInfo';
 import { TimeRangeSelector, formatTimeRangeCaption, type TimeRange } from './TimeRangeSelector';
 import { DisableModelModal } from './DisableModelModal';
 import {
@@ -62,7 +61,14 @@ interface PrecomputedStats {
 // 虚拟滚动行高
 const ROW_HEIGHT = 40;
 
-export function RequestLogs({ data, loading: parentLoading, providerMap, providerTypeMap, authIndexProviderMap, apiFilter }: RequestLogsProps) {
+export function RequestLogs({
+  data,
+  loading: parentLoading,
+  providerMap,
+  providerTypeMap,
+  authIndexProviderMap,
+  apiFilter,
+}: RequestLogsProps) {
   const { t } = useTranslation();
   const [filterApi, setFilterApi] = useState('');
   const [filterModel, setFilterModel] = useState('');
@@ -98,7 +104,7 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
 
   // 认证文件映射（优先使用 prop，否则自行加载）
   const [localAuthFileMap, setLocalAuthFileMap] = useState<Map<string, CredentialInfo>>(new Map());
-  const authFileMap = propAuthFileMap?.size ? propAuthFileMap : localAuthFileMap;
+  const authFileMap = localAuthFileMap;
 
   // 使用禁用模型 Hook
   const {
@@ -108,7 +114,7 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
     handleDisableClick,
     handleConfirmDisable,
     handleCancelDisable,
-  } = useDisableModel({ providerMap, sourceInfoMap });
+  } = useDisableModel({ providerMap });
 
   // 处理时间范围变化
   const handleTimeRangeChange = useCallback((range: TimeRange, custom?: DateRange) => {
@@ -121,7 +127,8 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
   // 使用日志独立数据或父组件数据
   const effectiveData = logData || data;
   // 只在首次加载且没有数据时显示 loading 状态
-  const showLoading = (parentLoading && isFirstLoad && !effectiveData) || (logLoading && !effectiveData);
+  const showLoading =
+    (parentLoading && isFirstLoad && !effectiveData) || (logLoading && !effectiveData);
 
   // 当父组件数据加载完成时，标记首次加载完成
   useEffect(() => {
@@ -137,11 +144,17 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
       const files = response?.files || [];
       const credMap = new Map<string, CredentialInfo>();
       files.forEach((file) => {
-        const credKey = normalizeAuthIndex((file as Record<string, unknown>)['auth_index'] ?? file.authIndex);
+        const credKey = normalizeAuthIndex(
+          (file as Record<string, unknown>)['auth_index'] ?? file.authIndex
+        );
         if (credKey) {
           credMap.set(credKey, {
             name: file.name || credKey,
-            type: ((file as Record<string, unknown>).type || (file as Record<string, unknown>).provider || '').toString()
+            type: (
+              (file as Record<string, unknown>).type ||
+              (file as Record<string, unknown>).provider ||
+              ''
+            ).toString(),
           });
         }
       });
@@ -192,7 +205,10 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
 
           if (!apiData?.models) return;
 
-          const filteredModels: Record<string, { details: UsageData['apis'][string]['models'][string]['details'] }> = {};
+          const filteredModels: Record<
+            string,
+            { details: UsageData['apis'][string]['models'][string]['details'] }
+          > = {};
 
           Object.entries(apiData.models).forEach(([modelName, modelData]) => {
             if (!modelData?.details || !Array.isArray(modelData.details)) return;
@@ -295,7 +311,6 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
 
     const entries: LogEntry[] = [];
     let idCounter = 0;
-    const normalizeCache = new Map<string, string>();
 
     Object.entries(effectiveData.apis).forEach(([apiKey, apiData]) => {
       Object.entries(apiData.models).forEach(([modelName, modelData]) => {
@@ -304,10 +319,12 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
           const { masked } = getProviderDisplayParts(source, providerMap);
           const timestampMs = detail.timestamp ? new Date(detail.timestamp).getTime() : 0;
           // 获取提供商类型
-          const authProvider = detail.auth_index && authIndexProviderMap
-            ? authIndexProviderMap[String(detail.auth_index)]
-            : null;
+          const authProvider =
+            detail.auth_index && authIndexProviderMap
+              ? authIndexProviderMap[String(detail.auth_index)]
+              : null;
           const providerType = providerTypeMap[source] || authProvider || '--';
+          const displayName = authProvider ? `${authProvider} (${masked})` : masked;
           entries.push({
             id: `${idCounter++}`,
             timestamp: detail.timestamp,
@@ -316,7 +333,7 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
             model: modelName,
             source,
             displayName,
-            providerName: resolvedName,
+            providerName: authProvider,
             providerType,
             maskedKey: masked,
             failed: detail.failed,
@@ -331,7 +348,7 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
 
     // 按时间倒序排序
     return entries.sort((a, b) => b.timestampMs - a.timestampMs);
-  }, [effectiveData, providerMap, providerTypeMap, sourceInfoMap, authFileMap]);
+  }, [effectiveData, providerMap, providerTypeMap, authIndexProviderMap, authFileMap]);
 
   // 预计算所有条目的统计数据（一次性计算，避免渲染时重复计算）
   const precomputedStats = useMemo(() => {
@@ -438,11 +455,13 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
 
   // 获取预计算的统计数据
   const getStats = (entry: LogEntry): PrecomputedStats => {
-    return precomputedStats.get(entry.id) || {
-      recentRequests: [],
-      successRate: '0.0',
-      totalCount: 0,
-    };
+    return (
+      precomputedStats.get(entry.id) || {
+        recentRequests: [],
+        successRate: '0.0',
+        totalCount: 0,
+      }
+    );
   };
 
   // 渲染单行
@@ -455,16 +474,10 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
 
     return (
       <>
-        <td title={authDisplayName}>
-          {authDisplayName}
-        </td>
-        <td title={entry.apiKey}>
-          {maskSecret(entry.apiKey)}
-        </td>
+        <td title={authDisplayName}>{authDisplayName}</td>
+        <td title={entry.apiKey}>{maskSecret(entry.apiKey)}</td>
         <td>{entry.providerType}</td>
-        <td title={entry.model}>
-          {entry.model}
-        </td>
+        <td title={entry.model}>{entry.model}</td>
         <td title={entry.source}>
           {entry.providerName ? (
             <>
@@ -490,20 +503,19 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
             ))}
           </div>
         </td>
-        <td className={getRateClassName(rateValue, styles)}>
-          {stats.successRate}%
-        </td>
+        <td className={getRateClassName(rateValue, styles)}>{stats.successRate}%</td>
         <td>{formatNumber(stats.totalCount)}</td>
         <td>{formatNumber(entry.inputTokens)}</td>
         <td>{formatNumber(entry.outputTokens)}</td>
         <td>{formatNumber(entry.totalTokens)}</td>
         <td>{formatTimestamp(entry.timestamp)}</td>
         <td>
-          {entry.providerType.toLowerCase() === 'openai' && entry.source && entry.source !== '-' && entry.source !== 'unknown' ? (
+          {entry.providerType.toLowerCase() === 'openai' &&
+          entry.source &&
+          entry.source !== '-' &&
+          entry.source !== 'unknown' ? (
             disabled ? (
-              <span className={styles.disabledLabel}>
-                {t('monitor.logs.disabled')}
-              </span>
+              <span className={styles.disabledLabel}>{t('monitor.logs.disabled')}</span>
             ) : (
               <button
                 className={styles.disableBtn}
@@ -527,8 +539,12 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
         title={t('monitor.logs.title')}
         subtitle={
           <span>
-            {formatTimeRangeCaption(timeRange, customRange, t)} · {t('monitor.logs.total_count', { count: logEntries.length })}
-            <span style={{ color: 'var(--text-tertiary)' }}> · {t('monitor.logs.scroll_hint')}</span>
+            {formatTimeRangeCaption(timeRange, customRange, t)} ·{' '}
+            {t('monitor.logs.total_count', { count: logEntries.length })}
+            <span style={{ color: 'var(--text-tertiary)' }}>
+              {' '}
+              · {t('monitor.logs.scroll_hint')}
+            </span>
           </span>
         }
         extra={
@@ -560,7 +576,9 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
           >
             <option value="">{t('monitor.logs.all_provider_types')}</option>
             {providerTypes.map((type) => (
-              <option key={type} value={type}>{type}</option>
+              <option key={type} value={type}>
+                {type}
+              </option>
             ))}
           </select>
           <select
@@ -570,7 +588,9 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
           >
             <option value="">{t('monitor.logs.all_models')}</option>
             {models.map((model) => (
-              <option key={model} value={model}>{model}</option>
+              <option key={model} value={model}>
+                {model}
+              </option>
             ))}
           </select>
           <select
@@ -595,9 +615,7 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
             <option value="failed">{t('monitor.logs.failed')}</option>
           </select>
 
-          <span className={styles.logLastUpdate}>
-            {getCountdownText()}
-          </span>
+          <span className={styles.logLastUpdate}>{getCountdownText()}</span>
 
           <select
             className={styles.logSelect}
@@ -695,7 +713,14 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
 
         {/* 统计信息 */}
         {filteredEntries.length > 0 && (
-          <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-tertiary)', marginTop: 8 }}>
+          <div
+            style={{
+              textAlign: 'center',
+              fontSize: 12,
+              color: 'var(--text-tertiary)',
+              marginTop: 8,
+            }}
+          >
             {t('monitor.logs.total_count', { count: filteredEntries.length })}
           </div>
         )}

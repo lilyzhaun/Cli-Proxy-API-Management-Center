@@ -39,8 +39,8 @@ jobs:
           cp -r dist/* release-bundle/
           mv release-bundle/index.html release-bundle/management.html
           cd release-bundle
-          zip -r ../management-pwa-bundle.zip .
-          ls -lh ../management-pwa-bundle.zip management.html manifest.webmanifest sw.js pwa-192.png pwa-512.png
+          zip -r ../management-bundle.zip .
+          ls -lh ../management-bundle.zip management.html
 
       - name: Generate release notes
         run: |
@@ -61,11 +61,7 @@ jobs:
         with:
           files: |
             release-bundle/management.html
-            release-bundle/manifest.webmanifest
-            release-bundle/sw.js
-            release-bundle/pwa-192.png
-            release-bundle/pwa-512.png
-            management-pwa-bundle.zip
+            management-bundle.zip
           body_path: release-notes.md
           draft: false
           prerelease: false
