@@ -231,6 +231,8 @@ export function MonitorPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
+    // 渠道映射并行加载，但不阻塞主数据展示
+    loadProviderMap();
     try {
       // 并行加载使用数据和渠道映射
       const [response] = await Promise.all([usageApi.getUsage(), loadProviderMap()]);

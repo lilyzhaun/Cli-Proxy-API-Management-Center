@@ -4,9 +4,11 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { Card } from '@/components/ui/Card';
 import { usageApi, authFilesApi } from '@/services/api';
 import { useDisableModel } from '@/hooks';
+import { normalizeUsageSourceId, normalizeAuthIndex } from '@/utils/usage';
+import { resolveSourceDisplay } from '@/utils/sourceResolver';
+import type { SourceInfo, CredentialInfo } from '@/types/sourceInfo';
 import { TimeRangeSelector, formatTimeRangeCaption, type TimeRange } from './TimeRangeSelector';
 import { DisableModelModal } from './DisableModelModal';
-import { UnsupportedDisableModal } from './UnsupportedDisableModal';
 import {
   maskSecret,
   formatProviderDisplay,
@@ -94,20 +96,19 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
   const [logLoading, setLogLoading] = useState(false);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
 
-  // 认证文件索引到名称的映射
-  const [authIndexMap, setAuthIndexMap] = useState<Record<string, string>>({});
+  // 认证文件映射（优先使用 prop，否则自行加载）
+  const [localAuthFileMap, setLocalAuthFileMap] = useState<Map<string, CredentialInfo>>(new Map());
+  const authFileMap = propAuthFileMap?.size ? propAuthFileMap : localAuthFileMap;
 
   // 使用禁用模型 Hook
   const {
     disableState,
-    unsupportedState,
     disabling,
     isModelDisabled,
     handleDisableClick,
     handleConfirmDisable,
     handleCancelDisable,
-    handleCloseUnsupported,
-  } = useDisableModel({ providerMap, providerTypeMap });
+  } = useDisableModel({ providerMap, sourceInfoMap });
 
   // 处理时间范围变化
   const handleTimeRangeChange = useCallback((range: TimeRange, custom?: DateRange) => {
@@ -129,23 +130,22 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
     }
   }, [parentLoading, data]);
 
-  // 加载认证文件映射（authIndex -> 文件名）
-  const loadAuthIndexMap = useCallback(async () => {
+  // 加载认证文件映射（用于 resolveSourceDisplay）
+  const loadAuthFileMap = useCallback(async () => {
     try {
       const response = await authFilesApi.list();
       const files = response?.files || [];
-      const map: Record<string, string> = {};
+      const credMap = new Map<string, CredentialInfo>();
       files.forEach((file) => {
-        // 兼容 auth_index 和 authIndex 两种字段名（API 返回的是 auth_index）
-        const rawAuthIndex = (file as Record<string, unknown>)['auth_index'] ?? file.authIndex;
-        if (rawAuthIndex !== undefined && rawAuthIndex !== null) {
-          const authIndexKey = String(rawAuthIndex).trim();
-          if (authIndexKey) {
-            map[authIndexKey] = file.name;
-          }
+        const credKey = normalizeAuthIndex((file as Record<string, unknown>)['auth_index'] ?? file.authIndex);
+        if (credKey) {
+          credMap.set(credKey, {
+            name: file.name || credKey,
+            type: ((file as Record<string, unknown>).type || (file as Record<string, unknown>).provider || '').toString()
+          });
         }
       });
-      setAuthIndexMap(map);
+      setLocalAuthFileMap(credMap);
     } catch (err) {
       console.warn('Failed to load auth files for index mapping:', err);
     }
@@ -153,8 +153,8 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
 
   // 初始加载认证文件映射
   useEffect(() => {
-    loadAuthIndexMap();
-  }, [loadAuthIndexMap]);
+    loadAuthFileMap();
+  }, [loadAuthFileMap]);
 
   // 独立获取日志数据
   const fetchLogData = useCallback(async () => {
@@ -264,8 +264,13 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
     };
   }, [autoRefresh]);
 
-  // 时间范围变化时立即刷新数据
+  // 时间范围变化时立即刷新数据（跳过初次挂载，初次使用父组件数据）
+  const skipInitialFetch = useRef(true);
   useEffect(() => {
+    if (skipInitialFetch.current) {
+      skipInitialFetch.current = false;
+      return;
+    }
     fetchLogData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeRange, customRange]);
@@ -290,13 +295,13 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
 
     const entries: LogEntry[] = [];
     let idCounter = 0;
+    const normalizeCache = new Map<string, string>();
 
     Object.entries(effectiveData.apis).forEach(([apiKey, apiData]) => {
       Object.entries(apiData.models).forEach(([modelName, modelData]) => {
         modelData.details.forEach((detail) => {
           const source = detail.source || 'unknown';
-          const { provider, masked } = getProviderDisplayParts(source, providerMap);
-          const displayName = provider ? `${provider} (${masked})` : masked;
+          const { masked } = getProviderDisplayParts(source, providerMap);
           const timestampMs = detail.timestamp ? new Date(detail.timestamp).getTime() : 0;
           // 获取提供商类型
           const authProvider = detail.auth_index && authIndexProviderMap
@@ -311,7 +316,7 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
             model: modelName,
             source,
             displayName,
-            providerName: provider,
+            providerName: resolvedName,
             providerType,
             maskedKey: masked,
             failed: detail.failed,
@@ -326,7 +331,7 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
 
     // 按时间倒序排序
     return entries.sort((a, b) => b.timestampMs - a.timestampMs);
-  }, [effectiveData, providerMap, providerTypeMap]);
+  }, [effectiveData, providerMap, providerTypeMap, sourceInfoMap, authFileMap]);
 
   // 预计算所有条目的统计数据（一次性计算，避免渲染时重复计算）
   const precomputedStats = useMemo(() => {
@@ -446,7 +451,7 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
     const rateValue = parseFloat(stats.successRate);
     const disabled = isModelDisabled(entry.source, entry.model);
     // 将 authIndex 映射为文件名
-    const authDisplayName = entry.authIndex ? (authIndexMap[entry.authIndex] || entry.authIndex) : '-';
+    const authDisplayName = entry.authIndex || '-';
 
     return (
       <>
@@ -494,7 +499,7 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
         <td>{formatNumber(entry.totalTokens)}</td>
         <td>{formatTimestamp(entry.timestamp)}</td>
         <td>
-          {entry.source && entry.source !== '-' && entry.source !== 'unknown' ? (
+          {entry.providerType.toLowerCase() === 'openai' && entry.source && entry.source !== '-' && entry.source !== 'unknown' ? (
             disabled ? (
               <span className={styles.disabledLabel}>
                 {t('monitor.logs.disabled')}
@@ -702,12 +707,6 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
         disabling={disabling}
         onConfirm={handleConfirmDisable}
         onCancel={handleCancelDisable}
-      />
-
-      {/* 不支持自动禁用提示弹窗 */}
-      <UnsupportedDisableModal
-        state={unsupportedState}
-        onClose={handleCloseUnsupported}
       />
     </>
   );

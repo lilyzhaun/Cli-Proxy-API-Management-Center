@@ -2,6 +2,9 @@ import { useMemo, useState, useCallback, Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/Card';
 import { useDisableModel } from '@/hooks';
+import { normalizeUsageSourceId } from '@/utils/usage';
+import { resolveSourceDisplay } from '@/utils/sourceResolver';
+import type { SourceInfo, CredentialInfo } from '@/types/sourceInfo';
 import { TimeRangeSelector, formatTimeRangeCaption, type TimeRange } from './TimeRangeSelector';
 import { DisableModelModal } from './DisableModelModal';
 import {
@@ -35,6 +38,7 @@ interface FailureStat {
   source: string;
   displayName: string;
   providerName: string | null;
+  providerType: string;
   maskedKey: string;
   failedCount: number;
   lastFailTime: number;
@@ -59,7 +63,7 @@ export function FailureAnalysis({ data, loading, providerMap, providerModels, au
     handleDisableClick: onDisableClick,
     handleConfirmDisable,
     handleCancelDisable,
-  } = useDisableModel({ providerMap, providerModels });
+  } = useDisableModel({ providerMap, providerModels, sourceInfoMap });
 
   // 处理时间范围变化
   const handleTimeRangeChange = useCallback((range: TimeRange, custom?: DateRange) => {
@@ -78,6 +82,17 @@ export function FailureAnalysis({ data, loading, providerMap, providerModels, au
   const failureStats = useMemo(() => {
     if (!timeFilteredData?.apis) return [];
 
+    const normalizeCache = new Map<string, string>();
+    const credMap = authFileMap || new Map<string, CredentialInfo>();
+    const getNormalized = (source: string) => {
+      let result = normalizeCache.get(source);
+      if (result === undefined) {
+        result = normalizeUsageSourceId(source);
+        normalizeCache.set(source, result);
+      }
+      return result;
+    };
+
     // 首先收集有失败记录的渠道
     const failedSources = new Set<string>();
     Object.values(timeFilteredData.apis).forEach((apiData) => {
@@ -85,6 +100,8 @@ export function FailureAnalysis({ data, loading, providerMap, providerModels, au
         modelData.details.forEach((detail) => {
           if (detail.failed) {
             const source = detail.source || 'unknown';
+            const normalizedSource = getNormalized(source);
+            const sourceInfo = resolveSourceDisplay(normalizedSource, detail.auth_index, sourceInfoMap, credMap);
             const { provider } = getProviderDisplayParts(source, providerMap);
             const authProvider = detail.auth_index && authIndexProviderMap
               ? authIndexProviderMap[String(detail.auth_index)]
@@ -107,6 +124,8 @@ export function FailureAnalysis({ data, loading, providerMap, providerModels, au
           // 只统计有失败记录的渠道
           if (!failedSources.has(source)) return;
 
+          const normalizedSource = getNormalized(source);
+          const sourceInfo = resolveSourceDisplay(normalizedSource, detail.auth_index, sourceInfoMap, credMap);
           const { provider, masked } = getProviderDisplayParts(source, providerMap);
           const authProvider = detail.auth_index && authIndexProviderMap
             ? authIndexProviderMap[String(detail.auth_index)]
@@ -389,15 +408,17 @@ export function FailureAnalysis({ data, loading, providerMap, providerModels, au
                                         </td>
                                         <td>{formatTimestamp(modelStat.lastTimestamp)}</td>
                                         <td>
-                                          {disabled ? (
-                                            <span className={styles.disabledLabel}>{t('monitor.logs.removed')}</span>
-                                          ) : stat.source && stat.source !== '-' && stat.source !== 'unknown' ? (
-                                            <button
-                                              className={styles.disableBtn}
-                                              onClick={(e) => handleDisableClick(stat.source, modelName, e)}
-                                            >
-                                              {t('monitor.logs.disable')}
-                                            </button>
+                                          {stat.providerType.toLowerCase() === 'openai' ? (
+                                            disabled ? (
+                                              <span className={styles.disabledLabel}>{t('monitor.logs.removed')}</span>
+                                            ) : stat.source && stat.source !== '-' && stat.source !== 'unknown' ? (
+                                              <button
+                                                className={styles.disableBtn}
+                                                onClick={(e) => handleDisableClick(stat.source, modelName, e)}
+                                              >
+                                                {t('monitor.logs.disable')}
+                                              </button>
+                                            ) : '-'
                                           ) : '-'}
                                         </td>
                                       </tr>

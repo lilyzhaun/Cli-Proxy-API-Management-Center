@@ -2,6 +2,9 @@ import { useMemo, useState, useCallback, Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/Card';
 import { useDisableModel } from '@/hooks';
+import { normalizeUsageSourceId } from '@/utils/usage';
+import { resolveSourceDisplay } from '@/utils/sourceResolver';
+import type { SourceInfo, CredentialInfo } from '@/types/sourceInfo';
 import { TimeRangeSelector, formatTimeRangeCaption, type TimeRange } from './TimeRangeSelector';
 import { DisableModelModal } from './DisableModelModal';
 import {
@@ -35,6 +38,7 @@ interface ChannelStat {
   source: string;
   displayName: string;
   providerName: string | null;
+  providerType: string;
   maskedKey: string;
   totalRequests: number;
   successRequests: number;
@@ -64,7 +68,7 @@ export function ChannelStats({ data, loading, providerMap, providerModels, authI
     handleDisableClick: onDisableClick,
     handleConfirmDisable,
     handleCancelDisable,
-  } = useDisableModel({ providerMap, providerModels });
+  } = useDisableModel({ providerMap, providerModels, sourceInfoMap });
 
   // 处理时间范围变化
   const handleTimeRangeChange = useCallback((range: TimeRange, custom?: DateRange) => {
@@ -84,12 +88,20 @@ export function ChannelStats({ data, loading, providerMap, providerModels, authI
     if (!timeFilteredData?.apis) return [];
 
     const stats: Record<string, ChannelStat> = {};
+    const normalizeCache = new Map<string, string>();
+    const credMap = authFileMap || new Map<string, CredentialInfo>();
 
     Object.values(timeFilteredData.apis).forEach((apiData) => {
       Object.entries(apiData.models).forEach(([modelName, modelData]) => {
         modelData.details.forEach((detail) => {
           const source = detail.source || 'unknown';
-          // 获取渠道显示信息
+          // 使用与请求事件明细相同的解析逻辑
+          let normalizedSource = normalizeCache.get(source);
+          if (normalizedSource === undefined) {
+            normalizedSource = normalizeUsageSourceId(source);
+            normalizeCache.set(source, normalizedSource);
+          }
+          const sourceInfo = resolveSourceDisplay(normalizedSource, detail.auth_index, sourceInfoMap, credMap);
           const { provider, masked } = getProviderDisplayParts(source, providerMap);
           const authProvider = detail.auth_index && authIndexProviderMap
             ? authIndexProviderMap[String(detail.auth_index)]
@@ -384,15 +396,17 @@ export function ChannelStats({ data, loading, providerMap, providerModels, authI
                                       </td>
                                       <td>{formatTimestamp(modelStat.lastTimestamp)}</td>
                                       <td>
-                                        {disabled ? (
-                                          <span className={styles.disabledLabel}>{t('monitor.logs.removed')}</span>
-                                        ) : stat.source && stat.source !== '-' && stat.source !== 'unknown' ? (
-                                          <button
-                                            className={styles.disableBtn}
-                                            onClick={(e) => handleDisableClick(stat.source, modelName, e)}
-                                          >
-                                            {t('monitor.logs.disable')}
-                                          </button>
+                                        {stat.providerType.toLowerCase() === 'openai' ? (
+                                          disabled ? (
+                                            <span className={styles.disabledLabel}>{t('monitor.logs.removed')}</span>
+                                          ) : stat.source && stat.source !== '-' && stat.source !== 'unknown' ? (
+                                            <button
+                                              className={styles.disableBtn}
+                                              onClick={(e) => handleDisableClick(stat.source, modelName, e)}
+                                            >
+                                              {t('monitor.logs.disable')}
+                                            </button>
+                                          ) : '-'
                                         ) : '-'}
                                       </td>
                                     </tr>
